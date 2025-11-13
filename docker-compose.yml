@@ -53,7 +53,22 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
+  minio:
+    image: minio/minio
+    container_name: rdt_minio
+    ports:
+      - "9000:9000"  # API S3 (Le port de l'API)
+      - "9001:9001"  # Console d'administration (Le port du navigateur)
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: miniopassword
+      MINIO_DEFAULT_BUCKETS: replate-bucket
+    # COMMANDE CORRIGÉE : Indique que l'API est sur le port 9000 interne
+    # et la console est sur le port 9001 interne.
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
 volumes:
   postgres_data:
   mongo_data:
+  minio_data:
