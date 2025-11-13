@@ -1,112 +1,140 @@
-🤝 Guide de Contribution - Backend Replate
-Bienvenue dans l'équipe ! Ce guide explique comment cloner, installer et contribuer à l'architecture microservices du projet Replate.
+# Replate - Backend Microservices
 
-1. Clonage et Configuration Initiale
-Avant de pouvoir coder, vous devez mettre en place l'environnement de développement complet, qui inclut l'infrastructure Docker et les microservices Spring Boot.
+Ce dépôt contient l'architecture microservices backend pour la plateforme Replate. Le système est construit avec Spring Boot et géré via Docker Compose pour l'infrastructure.
 
-Étape 1 : Prérequis
-Assurez-vous d'avoir installé :
+## 🧭 Vue d'ensemble de l'Architecture
 
-Git
+Le projet suit une architecture microservices complète incluant :
+* **Service Discovery** (`eureka-server`): Pour que les services puissent se trouver.
+* **API Gateway** (`api-gateway`): Le point d'entrée unique pour toutes les requêtes front-end.
+* **Services Métier** (`user-management-service`, `file-service`, etc.) : Gèrent la logique spécifique.
+* **Communication Asynchrone** (`Kafka`): Pour les événements (ex: inscription utilisateur).
+* **Infrastructure de Persistance** (`PostgreSQL`, `MinIO`, `MongoDB`): Bases de données et stockage de fichiers.
 
-Docker Desktop
+## 🛠️ Prérequis
 
-Java 17 (ou supérieur)
+Avant de commencer, assurez-vous d'avoir installé les outils suivants sur votre machine :
+* Java 17 (ou une version compatible)
+* Docker Desktop (en cours d'exécution)
+* Votre IDE Java (IntelliJ IDEA est recommandé)
+* Postman (pour les tests API)
+* Maven (généralement inclus dans IntelliJ)
 
-IntelliJ IDEA (recommandé) ou un IDE équivalent
+## 🐳 1. Lancement de l'Infrastructure (Docker)
 
-Étape 2 : Cloner le Dépôt (Monorepo)
-Clonez le dépôt principal sur votre machine locale.
+Toutes nos bases de données et brokers sont gérés par Docker.
 
-Bash
+1.  Ouvrez un terminal à la racine du projet.
+2.  Lancez tous les services d'infrastructure (PostgreSQL, Kafka, MinIO, MongoDB) :
+    ```bash
+    docker compose up -d
+    ```
+3.  Vérifiez que tout est en cours d'exécution :
+    ```bash
+    docker compose ps
+    ```
+    (Tous les services doivent être en statut `running`).
 
-git clone https://github.com/[VOTRE_ORGANISATION]/rdt-microservice-backend.git
-cd rdt-microservice-backend
-Étape 3 : Lancer l'Infrastructure Externe
-Tous nos services (PostgreSQL, Kafka, MinIO, MongoDB) sont gérés par Docker.
+## ▶️ 2. Lancement des Microservices (Spring Boot)
 
-Bash
+Vous devez lancer les applications Spring Boot dans l'ordre suivant depuis IntelliJ :
 
-docker compose up -d
-Attendez que tous les conteneurs soient en statut "running".
+1.  **`eureka-server`** (Attendre qu'il soit démarré)
+2.  **`api-gateway`**
+3.  **`file-service`**
+4.  **`user-management-service`**
+5.  *(...les autres services comme `offer-management-service`...)*
 
-Étape 4 : Ouvrir le Projet dans IntelliJ
-Ce projet est un Monorepo. Vous devez ouvrir le dossier racine et importer tous les sous-projets.
+### Validation du Lancement
 
-Dans IntelliJ, choisissez File > Open et sélectionnez le dossier racine rdt-microservice-backend.
+Ouvrez le tableau de bord **Eureka** dans votre navigateur pour confirmer que tous les services sont enregistrés et `UP` :
+* **URL :** `http://localhost:8761`
 
-Ouvrez l'onglet Maven (sur la droite de l'IDE).
+## 📍 Répertoire des Endpoints (Localhost)
 
-Cliquez sur l'icône "Reload All Maven Projects" (flèches circulaires).
+Voici les adresses locales pour accéder aux différents services :
 
-Note : IntelliJ va maintenant télécharger les dépendances pour les 8+ microservices (UMS, Gateway, Eureka, etc.). Cela peut prendre quelques minutes.
+| Service | Port (Local) | Usage |
+| :--- | :--- | :--- |
+| **API Gateway** | `http://localhost:8081` | **Point d'entrée principal pour tous les tests Postman.** |
+| Eureka Dashboard | `http://localhost:8761` | Tableau de bord de la découverte de services. |
+| MinIO Console | `http://localhost:9001` | Interface web pour voir les fichiers uploadés (Login: `minioadmin` / `miniopassword`). |
+| PostgreSQL | `localhost:5432` | Accès DB (via DBeaver/pgAdmin) (Login: `rdtuser` / `rdtpassword`, DB: `rdt_db`). |
+| MongoDB | `localhost:27017` | Accès DB (via Compass). |
 
-Étape 5 : Lancer les Microservices (Ordre Important)
-L'ordre de lancement est crucial pour que la découverte de services fonctionne.
+---
 
-Serveur de Découverte : Lancez EurekaServerApplication.
+## 🚀 3. Tests des Scénarios d'Usage (Postman)
 
-Infrastructure Spring : Lancez ApiGatewayApplication et FileServiceApplication.
+Utilisez la collection Postman fournie pour tester les flux. Toutes les requêtes doivent passer par l'**API Gateway (port 8081)**.
 
-Services Métier : Lancez UserManagementServiceApplication (et les autres services sur lesquels vous travaillez).
+### Scénario 1 : Inscription d'un nouveau Marchand
 
-Étape 6 : Validation
-Ouvrez votre navigateur et vérifiez le tableau de bord Eureka : http://localhost:8761. Vous devriez voir tous les services que vous avez lancés (API-GATEWAY, FILE-SERVICE, USER-MANAGEMENT-SERVICE) avec le statut UP.
+Ce scénario teste le `file-service` et le `user-management-service`.
 
-2. Processus de Contribution (Workflow de Développement)
-Suivez ces étapes pour ajouter de nouvelles fonctionnalités ou corriger des bugs.
+1.  **Uploader l'image de profil (File Service)**
+    * **Méthode :** `POST`
+    * **URL :** `http://localhost:8081/api/v1/files/upload`
+    * **Body (form-data) :**
+        * `file` : [Choisir un fichier image.jpg]
+        * `type` : `profiles`
+    * **Réponse :** Copiez l'URL de MinIO (ex: `http://localhost:9000/replate-bucket/profiles/...`).
 
-Étape 1 : Créer une Branche
-Ne travaillez jamais directement sur la branche main !
+2.  **Créer le compte (UMS)**
+    * **Méthode :** `POST`
+    * **URL :** `http://localhost:8081/api/v1/users/register`
+    * **Body (JSON) :**
+        ```json
+        {
+            "email": "new_merchant@test.com",
+            "password": "Password123!",
+            "role": "MERCHANT",
+            "registrationNumber": "REG-123",
+            "profileImageUrl": "COPIEZ_L_URL_DE_L_ETAPE_1_ICI"
+        }
+        ```
+    * **Réponse :** `201 Created` avec un message de succès.
 
-Assurez-vous d'être à jour :
+### Scénario 2 : Connexion et Validation Admin (RDT-4)
 
-Bash
+Ce scénario teste l'authentification (JWT) et l'autorisation par rôle (`hasRole("ADMIN")`).
 
-git checkout main
-git pull origin main
-Créez votre branche de fonctionnalité. Utilisez un nom descriptif (ex: feature/OMS-crud-annonces ou fix/UMS-bug-validation) :
+1.  **Connexion Admin** (L'admin est créé au démarrage par le `AdminSeeder`)
+    * **Méthode :** `POST`
+    * **URL :** `http://localhost:8081/api/v1/users/login`
+    * **Body (JSON) :**
+        ```json
+        {
+            "email": "admin@replate.com",
+            "password": "admin12345"
+        }
+        ```
+    * **Réponse :** Copiez le `jwtToken` de la réponse.
 
-Bash
+2.  **Consulter les comptes en attente (Admin)**
+    * **Méthode :** `GET`
+    * **URL :** `http://localhost:8081/api/v1/admin/pending`
+    * **Authentification (Auth) :** Type `Bearer Token`, collez le token Admin.
+    * **Réponse :** `200 OK` avec la liste des utilisateurs (y compris le "new_merchant" créé à l'étape 1).
 
-git checkout -b feature/OMS-crud-annonces
-Étape 2 : Coder et Tester
-Implémentez votre logique dans le microservice approprié (ex: offer-management-service).
+3.  **Valider le compte (Admin)**
+    * **Méthode :** `POST`
+    * **URL :** `http://localhost:8081/api/v1/admin/validate/1` (Remplacez `1` par l'ID du marchand à valider).
+    * **Authentification (Auth) :** Type `Bearer Token`, collez le token Admin.
+    * **Réponse :** `200 OK`.
 
-Assurez-vous que le service démarre.
+---
 
-Utilisez la collection Postman du projet pour tester vos nouveaux endpoints avant de commiter.
+## 🧬 Pile Technologique
 
-Étape 3 : Commiter vos Changements
-Faites des commits atomiques (petits et ciblés). Lorsque vous commitez, ajoutez uniquement le dossier du service que vous avez modifié (ou les fichiers pertinents) depuis la racine du monorepo.
-
-Ajouter les changements :
-
-Bash
-
-# Exemple si vous avez modifié le service OMS
-git add offer-management-service/
-Commiter (Standard "Conventional Commits") : Utilisez des préfixes pour indiquer le service (scope) et le type de changement (type).
-
-Type : feat (nouvelle fonctionnalité), fix (correction de bug), refactor (nettoyage de code), docs (documentation).
-
-Scope : Le nom du microservice (ex: ums, oms, gateway, docker).
-
-Bash
-
-git commit -m "feat(oms): Ajout des endpoints CRUD pour les annonces"
-Bash
-
-git commit -m "fix(ums): Correction de l'exception lors du login"
-Étape 4 : Pousser et Créer une Pull Request (PR)
-Poussez votre branche vers le dépôt distant :
-
-Bash
-
-git push origin feature/OMS-crud-annonces
-Allez sur GitHub et créez une Pull Request (PR) de votre branche vers la branche main.
-
-Dans la description de la PR, expliquez ce que vous avez fait et (si possible) comment le tester.
-
-Étape 5 : Revue de Code
-Attendez que vos collaborateurs examinent votre code, fassent des commentaires, et approuvent la PR avant de la fusionner (Merge).
+* Java 17
+* Spring Boot 3+
+* Spring Cloud Gateway (Routage)
+* Spring Cloud Eureka (Découverte)
+* Spring Security (JWT)
+* Spring Data JPA (PostgreSQL)
+* Spring Data MongoDB
+* Spring Kafka (Broker de messages)
+* MinIO (Stockage S3)
+* Docker Compose
+* Maven
