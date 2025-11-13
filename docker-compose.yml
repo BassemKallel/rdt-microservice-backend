@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+  # ----------------------------------------
+  # 1. PostgreSQL (Base de données relationnelle pour UMS, OMS, RTS)
+  # ----------------------------------------
+  postgres:
+    image: postgres:14
+    container_name: rdt_postgres
+    # Variables d'environnement utilisées par les microservices
+    environment:
+      POSTGRES_USER: rdtuser
+      POSTGRES_PASSWORD: rdtpassword
+      POSTGRES_DB: rdt_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # ----------------------------------------
+  # 2. MongoDB (Base de données NoSQL pour Reporting et Analytics)
+  # ----------------------------------------
+  mongodb:
+    image: mongo:latest
+    container_name: rdt_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  # ----------------------------------------
+  # 3. Kafka (Message Broker pour la communication asynchrone)
+  # ----------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: rdt_zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: rdt_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Adresse essentielle pour les microservices Spring Boot
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+volumes:
+  postgres_data:
+  mongo_data:

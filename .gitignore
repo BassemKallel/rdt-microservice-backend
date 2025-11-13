@@ -1,0 +1,15 @@
+# Fichier .gitignore
+# Java
+*.class
+*.jar
+*.war
+*.ear
+# IDE
+.idea/
+*.iml
+.DS_Store
+# Maven/Gradle
+target/
+build/
+# Logs
+*.log
