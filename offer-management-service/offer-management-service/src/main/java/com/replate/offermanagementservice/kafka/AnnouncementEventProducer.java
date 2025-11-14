@@ -14,7 +14,6 @@ public class AnnouncementEventProducer {
     }
 
     public void sendAnnouncementEvent(Announcement announcement, String eventType) {
-        // Envoie le message sur le topic 'offer-events' avec le type d'événement (AD_CREATED, AD_UPDATED, etc.)
         kafkaTemplate.send(OFFER_TOPIC, eventType, announcement);
         System.out.println("✅ Événement Kafka : " + eventType + " envoyé pour Annonce ID: " + announcement.getId());
     }

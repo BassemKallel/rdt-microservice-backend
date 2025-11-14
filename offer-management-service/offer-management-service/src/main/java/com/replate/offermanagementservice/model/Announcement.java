@@ -1,6 +1,5 @@
 package com.replate.offermanagementservice.model;
 
-
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,7 +17,7 @@ public class Announcement {
     private Long id;
 
     @Column(nullable = false)
-    private Long merchantId;
+    private Long merchantId; // ID du propriétaire, lié au JWT
 
     private String title;
     private String description;
@@ -32,10 +31,8 @@ public class Announcement {
 
     private Double price;
 
-    // Fichiers
     private String imageUrl1;
 
-    // Dates
     private LocalDateTime expiryDate;
 
     @Column(nullable = false, updatable = false)

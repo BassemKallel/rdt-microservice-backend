@@ -23,7 +23,8 @@ public class AnnouncementController {
 
     @PostMapping("/create")
     public ResponseEntity<?> createAnnouncement(
-            @RequestBody @Valid AnnouncementRequest announcementDTO,
+            @RequestBody AnnouncementRequest announcementDTO,
+
             // 🚨 Lit les claims utilisateur depuis les headers injectés par le Gateway
             @RequestHeader("X-User-Id") Long merchantId,
             @RequestHeader("X-User-Role") String userRole,
@@ -32,24 +33,29 @@ public class AnnouncementController {
         log.info("🎯 Création annonce - MerchantID: {}, Role: {}, Validated: {}",
                 merchantId, userRole, isValidated);
 
-        // Vérification de sécurité basée sur le rôle
-        if (!"MERCHANT".equals(userRole)) {
-            return ResponseEntity.status(403).body("Seuls les MERCHANTS peuvent créer des annonces");
-        }
-
+        // Passe l'état de validation au service
         Announcement created = announcementService.createAnnouncement(announcementDTO, merchantId, isValidated);
         return ResponseEntity.ok(created);
     }
 
-    // Ajoutez ici d'autres endpoints CRUD...
-    // Exemple pour la modification :
+    // Endpoint de mise à jour (Exemple)
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateAnnouncement(
             @PathVariable Long id,
             @RequestBody @Valid AnnouncementRequest announcementDTO,
-            @RequestHeader("X-User-Id") Long currentUserId) {
+            @RequestHeader("X-User-Id") Long currentUserId,
+            @RequestHeader("X-User-Role") String userRole) {
 
-        Announcement updated = announcementService.updateAnnouncement(id, announcementDTO, currentUserId);
-        return ResponseEntity.ok(updated);
+        if (!"MERCHANT".equals(userRole)) {
+            return ResponseEntity.status(403).body("Seuls les MERCHANTS peuvent modifier des annonces");
+        }
+
+        try {
+            Announcement updated = announcementService.updateAnnouncement(id, announcementDTO, currentUserId);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            // Gérer les cas où l'annonce n'est pas trouvée ou l'utilisateur n'est pas propriétaire
+            return ResponseEntity.status(403).body(e.getMessage());
+        }
     }
 }

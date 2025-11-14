@@ -7,7 +7,7 @@ import com.replate.offermanagementservice.model.ModerationStatus;
 import com.replate.offermanagementservice.repository.AnnouncementRepository;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.LocalDateTime; // Ajout de l'import manquant
 import java.util.List;
 
 @Service
@@ -21,16 +21,15 @@ public class AnnouncementService {
         this.eventProducer = eventProducer;
     }
 
-    // 🚨 Mise à jour : Reçoit isValidated directement via le contrôleur (qui le lit du header)
+    // 🚨 Mise à jour : Reçoit isValidated directement via le contrôleur
     public Announcement createAnnouncement(AnnouncementRequest request, Long merchantId, Boolean isValidated) {
 
         // 2. Vérification de la Validation du Compte
         if (isValidated == null || !isValidated) {
             throw new RuntimeException("Le compte de l'utilisateur n'est pas validé et ne peut pas créer d'annonce.");
         }
-        Announcement announcement = new Announcement();
 
-        // Mappage des champs
+        Announcement announcement = new Announcement();
         announcement.setMerchantId(merchantId);
         announcement.setTitle(request.getTitle());
         announcement.setDescription(request.getDescription());
@@ -39,11 +38,10 @@ public class AnnouncementService {
         announcement.setImageUrl1(request.getImageUrl1());
         announcement.setExpiryDate(request.getExpiryDate());
         announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        announcement.setUpdatedAt(LocalDateTime.now()); // Initialisation
 
         Announcement savedAnnouncement = announcementRepository.save(announcement);
-
-        eventProducer.sendAnnouncementEvent(savedAnnouncement, "AD_CREATED"); // Événement Kafka
-
+        eventProducer.sendAnnouncementEvent(savedAnnouncement, "AD_CREATED");
         return savedAnnouncement;
     }
 
@@ -52,21 +50,17 @@ public class AnnouncementService {
         Announcement announcement = announcementRepository.findById(announcementId)
                 .orElseThrow(() -> new RuntimeException("Annonce non trouvée."));
 
-        // Sécurité : Vérifier que seul le propriétaire peut modifier l'annonce
         if (!announcement.getMerchantId().equals(merchantId)) {
             throw new RuntimeException("Permission insuffisante.");
         }
 
-        // Mises à jour des champs
         announcement.setTitle(request.getTitle());
         announcement.setDescription(request.getDescription());
         announcement.setPrice(request.getPrice());
-        announcement.setUpdatedAt(LocalDateTime.now()); // Ajout de la mise à jour de la date
+        announcement.setUpdatedAt(LocalDateTime.now()); // Mise à jour de la date
 
         Announcement updatedAnnouncement = announcementRepository.save(announcement);
-
         eventProducer.sendAnnouncementEvent(updatedAnnouncement, "AD_UPDATED");
-
         return updatedAnnouncement;
     }
 
@@ -75,7 +69,6 @@ public class AnnouncementService {
         Announcement announcement = announcementRepository.findById(announcementId)
                 .orElseThrow(() -> new RuntimeException("Annonce non trouvée."));
 
-        // Sécurité : Vérifier que seul le propriétaire peut supprimer
         if (!announcement.getMerchantId().equals(merchantId)) {
             throw new RuntimeException("Permission insuffisante.");
         }
@@ -86,7 +79,7 @@ public class AnnouncementService {
 
     // RDT-13 : Lecture publique
     public List<Announcement> getAllActiveAnnouncements() {
-        // En production, cette méthode devrait filtrer par ModerationStatus.ACCEPTED
+        // En production, devrait filtrer par ModerationStatus.ACCEPTED
         return announcementRepository.findAll();
     }
 }
