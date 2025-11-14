@@ -65,13 +65,7 @@ services:
       MINIO_DEFAULT_BUCKETS: replate-bucket
     # COMMANDE CORRIGÉE : Indique que l'API est sur le port 9000 interne
     # et la console est sur le port 9001 interne.
-    command: >
-                sh -c '
-                /usr/bin/minio server /data --console-address ":9001" &
-                sleep 5;
-                /usr/bin/mc alias set local http://localhost:9000 minioadmin miniopassword;
-                /usr/bin/mc anonymous set download local/replate-bucket
-                '
+    command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
 volumes:
