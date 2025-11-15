@@ -13,6 +13,8 @@ import com.replate.usermanagementservice.model.User;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 @Service
@@ -21,9 +23,21 @@ public class JwtService {
     private final long EXPIRATION = 86400000;
 
     public String generateToken(User user) {
+        // Crée une map pour stocker les claims personnalisés
+        Map<String, Object> claims = new HashMap<>();
+
+        // Claim 1 : Rôle (Déjà présent)
+        claims.put("role", user.getRole().name());
+
+        // 🚨 AJOUTS REQUIS (pour le Gateway)
+        // Claim 2 : ID de l'utilisateur
+        claims.put("userId", user.getId());
+        // Claim 3 : Statut de validation
+        claims.put("validated", user.isValidated());
+
         return Jwts.builder()
-                .claim("role", user.getRole().name())
-                .setSubject(user.getEmail())
+                .setClaims(claims) // Utilise la map de claims
+                .setSubject(user.getEmail()) // L'email est le sujet unique
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)

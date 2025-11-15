@@ -31,6 +31,17 @@ public class User {
     @Column(nullable = false)
     private boolean isValidated = false;
 
+    @Column(nullable = false)
+    private String username;
+
+    @Column(nullable = true)
+    private String location;
+
+    @Column(nullable = true)
+    private String PhoneNumber;
+
+
+
 
 
 }

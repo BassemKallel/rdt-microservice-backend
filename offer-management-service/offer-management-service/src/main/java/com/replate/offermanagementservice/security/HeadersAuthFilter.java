@@ -28,19 +28,18 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         final String userId = request.getHeader("X-User-Id");
-        final String userRole = request.getHeader("X-User-Role"); // Lecture du header
+        final String userRole = request.getHeader("X-User-Role");
         final String isValidated = request.getHeader("X-Is-Validated");
 
         log.debug("--- [OMS HeadersAuthFilter] Headers Reçus ---");
-        log.debug("Path: {}", request.getRequestURI());
+        log.debug("Path: {} {}", request.getMethod(), request.getRequestURI());
         log.debug("X-User-Id Header: '{}'", userId);
         log.debug("X-User-Role Header: '{}'", userRole);
         log.debug("X-Is-Validated Header: '{}'", isValidated);
         log.debug("-------------------------------------------------");
 
-        // Nous forçons l'authentification si les headers sont présents
+        // ✅ Authentification seulement si les headers sont présents
         if (userId != null && userRole != null) {
-
             String cleanedUserRole = userRole.trim();
 
             List<GrantedAuthority> authorities = Collections.singletonList(
@@ -48,7 +47,7 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
             );
 
             UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    Long.valueOf(userId.trim()), // Ajout de .trim() par sécurité
+                    Long.valueOf(userId.trim()),
                     null,
                     authorities
             );
@@ -56,7 +55,9 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);
 
-            log.debug("Contexte de sécurité Spring FORCÉ pour ROLE: {}", cleanedUserRole);
+            log.debug("✅ Contexte de sécurité Spring configuré - ROLE: {}", cleanedUserRole);
+        } else {
+            log.debug("ℹ️ Pas de headers d'authentification - endpoint public");
         }
 
         filterChain.doFilter(request, response);

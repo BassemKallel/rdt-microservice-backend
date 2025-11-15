@@ -59,6 +59,10 @@ public class UserService {
         newUser.setRole(role);
         newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
+        newUser.setUsername(request.getUsername());
+        newUser.setPhoneNumber(request.getPhoneNumber());
+        newUser.setLocation(request.getLocation());
+
         if(role == UserRole.ADMIN) newUser.setValidated(true);
 
         User savedUser = userRepository.save(newUser);

@@ -30,7 +30,7 @@ public class AdminSeeder implements CommandLineRunner {
             adminRequest.setEmail(adminEmail);
             adminRequest.setPassword("admin12345");
             adminRequest.setRole("ADMIN");
-
+            adminRequest.setUsername("AdminReplate");
             try {
                 userService.registerNewUser(adminRequest);
                 System.out.println("Compte Admin créé avec succès.");

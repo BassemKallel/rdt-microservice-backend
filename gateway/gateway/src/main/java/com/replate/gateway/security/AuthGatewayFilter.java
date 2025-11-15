@@ -1,6 +1,5 @@
 package com.replate.gateway.security;
 
-import com.replate.gateway.security.GatewayJwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
@@ -30,7 +29,9 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
             "/api/v1/users/register",
             "/api/v1/users/login",
             "/api/v1/offers/browse",
-            "/api/v1/offers/search"
+            "/api/v1/offers/search",
+            "/api/v1/files/upload"
+            // Ajoutez ici d'autres routes publiques comme /actuator/health, etc.
     );
 
     public AuthGatewayFilter(GatewayJwtUtil jwtUtil) {
@@ -59,14 +60,28 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
             // 3. Valider le token et extraire les claims
             Claims claims = jwtUtil.validateAndExtractClaims(token);
 
-            // 4. Mutate la requête en ajoutant les claims comme en-têtes
+            // 🚨 CORRECTION : Gestion des types (Integer/Boolean)
+
+            // Récupère le userId comme Integer (correspondant à jwt.io)
+            Integer userId = claims.get("userId", Integer.class);
+            // Récupère le rôle
+            String role = claims.get("role", String.class);
+            // Récupère la validation comme Boolean
+            Boolean isValidated = claims.get("validated", Boolean.class);
+
+            // Vérification que les claims critiques ne sont pas nuls
+            if (userId == null || role == null || isValidated == null) {
+                throw new JwtException("Token claims are incomplete (userId, role, or validated is missing)");
+            }
+
+            // 4. Mutate la requête en ajoutant les claims comme en-têtes (conversion sûre)
             ServerHttpRequest mutatedRequest = request.mutate()
-                    .header("X-User-Id", claims.get("userId", Long.class).toString())
-                    .header("X-User-Role", claims.get("role", String.class))
-                    .header("X-Is-Validated", claims.get("validated", Boolean.class).toString())
+                    .header("X-User-Id", userId.toString())
+                    .header("X-User-Role", role)
+                    .header("X-Is-Validated", isValidated.toString())
                     .build();
 
-            log.debug("✅ JWT validé. Headers injectés pour UserID: {}", claims.get("userId"));
+            log.debug("✅ JWT validé. Headers injectés pour UserID: {}", userId);
 
             // 5. Continuer la chaîne avec la nouvelle requête
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
@@ -74,6 +89,10 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
         } catch (JwtException e) {
             log.warn("❌ JWT Invalide pour la requête {} : {}", path, e.getMessage());
             return onError(exchange, "Invalid or expired authentication token", HttpStatus.UNAUTHORIZED);
+        } catch (Exception e) {
+            // Capture générale pour les erreurs de conversion
+            log.error("❌ Erreur inattendue lors du filtrage JWT : {}", e.getMessage());
+            return onError(exchange, "Internal Server Error during token processing", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
