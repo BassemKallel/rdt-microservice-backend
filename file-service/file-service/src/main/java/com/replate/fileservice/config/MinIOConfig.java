@@ -16,10 +16,8 @@ public class MinIOConfig {
 
     @Value("${minio.endpoint.url}")
     private String endpointUrl;
-
     @Value("${minio.access.key}")
     private String accessKey;
-
     @Value("${minio.secret.key}")
     private String secretKey;
 
@@ -27,13 +25,12 @@ public class MinIOConfig {
     public S3Client s3Client() {
         AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
 
-        // Configuration cruciale pour MinIO
         S3Configuration s3Config = S3Configuration.builder()
-                .pathStyleAccessEnabled(true)
+                .pathStyleAccessEnabled(true) // Force le Path Style (correction UnknownHostException)
                 .build();
 
         return S3Client.builder()
-                .endpointOverride(URI.create(endpointUrl.trim())) // .trim() par sécurité
+                .endpointOverride(URI.create(endpointUrl.trim()))
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .region(Region.US_EAST_1)
                 .serviceConfiguration(s3Config)

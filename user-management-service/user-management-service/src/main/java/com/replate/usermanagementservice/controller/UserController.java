@@ -8,6 +8,7 @@ import com.replate.usermanagementservice.model.User;
 import com.replate.usermanagementservice.model.UserRole;
 import com.replate.usermanagementservice.service.UserService;
 import com.replate.usermanagementservice.security.JwtService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +26,7 @@ public class UserController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Object> registerUser(@RequestBody RegisterRequest request) {
+    public ResponseEntity<Object> registerUser(@Valid @RequestBody RegisterRequest request) {
 
         // Le GlobalExceptionHandler intercepte les erreurs (EmailExists, MissingFields, IllegalArgument)
         User user = userService.registerNewUser(request);
@@ -39,7 +40,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Object> loginUser(@RequestBody AuthRequest request) {
+    public ResponseEntity<Object> loginUser(@Valid @RequestBody AuthRequest request) {
 
         // Le GlobalExceptionHandler intercepte (ResourceNotFoundException, InvalidCredentialsException)
         User user = userService.authenticate(request.getEmail(), request.getPassword());

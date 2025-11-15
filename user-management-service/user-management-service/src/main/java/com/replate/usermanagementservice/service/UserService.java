@@ -3,6 +3,7 @@ package com.replate.usermanagementservice.service;
 import com.replate.usermanagementservice.dto.RegisterRequest;
 import com.replate.usermanagementservice.exception.EmailAlreadyExistsException;
 import com.replate.usermanagementservice.exception.InvalidCredentialsException;
+import com.replate.usermanagementservice.exception.MissingRequiredFieldsException;
 import com.replate.usermanagementservice.exception.ResourceNotFoundException;
 import com.replate.usermanagementservice.model.*;
 import com.replate.usermanagementservice.repository.UserRepository;
@@ -37,11 +38,17 @@ public class UserService {
         switch (role) {
             case MERCHANT:
                 Merchant m = new Merchant();
+                if(request.getDocumentUrl() == null || request.getDocumentUrl().isEmpty()) {
+                    throw new MissingRequiredFieldsException("Le document justificatif est requis pour le rôle Merchant.");
+                }
                 m.setDocumentUrl(request.getDocumentUrl());
                 newUser = m;
                 break;
             case ASSOCIATION:
                 AssociationBeneficiary a = new AssociationBeneficiary();
+                if(request.getDocumentUrl() == null || request.getDocumentUrl().isEmpty()) {
+                    throw new MissingRequiredFieldsException("Le document justificatif est requis pour le rôle Association.");
+                }
                 a.setDocumentUrl(request.getDocumentUrl());
                 newUser = a;
                 break;
@@ -59,6 +66,9 @@ public class UserService {
         newUser.setRole(role);
         newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
+        if(request.getUsername() == null || request.getUsername().isEmpty()) {
+            throw new MissingRequiredFieldsException("Le nom d'utilisateur est requis.");
+        }
         newUser.setUsername(request.getUsername());
         newUser.setPhoneNumber(request.getPhoneNumber());
         newUser.setLocation(request.getLocation());
