@@ -116,4 +116,8 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
+    public User getUserById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + id));
+    }
 }

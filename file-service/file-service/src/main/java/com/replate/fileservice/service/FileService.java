@@ -61,18 +61,18 @@ public class FileService {
             System.out.println("FILE-SERVICE: Définition de la politique d'accès publique pour le bucket " + bucketName);
 
             String policyJson = String.format("""
-            {
-                "Version": "2012-10-17",
-                "Statement": [
                     {
-                        "Effect": "Allow",
-                        "Principal": "*",
-                        "Action": ["s3:GetObject"],
-                        "Resource": ["arn:aws:s3:::%s/*"]
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Principal": "*",
+                                "Action": ["s3:GetObject"],
+                                "Resource": ["arn:aws:s3:::%s/*"]
+                            }
+                        ]
                     }
-                ]
-            }
-            """, bucketName);
+                    """, bucketName);
 
             PutBucketPolicyRequest policyRequest = PutBucketPolicyRequest.builder()
                     .bucket(bucketName)
