@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Date;
+
 
 @Entity
 @Table(name = "users")
@@ -40,8 +42,8 @@ public class User {
     @Column(nullable = true)
     private String PhoneNumber;
 
-
-
-
+    @Column(nullable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date createdAt = new Date();
 
 }

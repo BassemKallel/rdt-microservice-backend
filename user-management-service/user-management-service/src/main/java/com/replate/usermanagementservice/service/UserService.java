@@ -41,6 +41,7 @@ public class UserService {
                 if(request.getDocumentUrl() == null || request.getDocumentUrl().isEmpty()) {
                     throw new MissingRequiredFieldsException("Le document justificatif est requis pour le rôle Merchant.");
                 }
+                m.setValidated(true);
                 m.setDocumentUrl(request.getDocumentUrl());
                 newUser = m;
                 break;
@@ -103,4 +104,16 @@ public class UserService {
         List<UserRole> rolesToValidate = List.of(UserRole.MERCHANT, UserRole.ASSOCIATION);
         return userRepository.findAllByIsValidatedFalseAndRoleIn(rolesToValidate);
     }
+
+    public List<User> getAllUsers() {
+        return userRepository.findAllByIsValidatedTrueAndRoleIn(List.of(UserRole.INDIVIDUAL, UserRole.MERCHANT, UserRole.ASSOCIATION));
+    }
+
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + id);
+        }
+        userRepository.deleteById(id);
+    }
+
 }

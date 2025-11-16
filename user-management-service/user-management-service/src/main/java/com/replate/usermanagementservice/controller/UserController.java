@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/users")
 public class UserController {
@@ -31,7 +33,6 @@ public class UserController {
         // Le GlobalExceptionHandler intercepte les erreurs (EmailExists, MissingFields, IllegalArgument)
         User user = userService.registerNewUser(request);
 
-        // Renvoyer le message approprié en fonction du rôle
         if (user.getRole() == UserRole.MERCHANT || user.getRole() == UserRole.ASSOCIATION) {
             return ResponseEntity.status(HttpStatus.CREATED).body(new MessageResponse("Inscription réussie. Compte en attente de validation."));
         }
@@ -42,7 +43,6 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<Object> loginUser(@Valid @RequestBody AuthRequest request) {
 
-        // Le GlobalExceptionHandler intercepte (ResourceNotFoundException, InvalidCredentialsException)
         User user = userService.authenticate(request.getEmail(), request.getPassword());
 
         String token = jwtService.generateToken(user);
@@ -55,5 +55,16 @@ public class UserController {
         );
 
         return ResponseEntity.ok(authResponse);
+    }
+    @GetMapping("/all")
+    public ResponseEntity<List<User>> getAllAccounts() {
+        List<User> allUsers = userService.getAllUsers();
+        return ResponseEntity.ok(allUsers);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Object> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.ok(new MessageResponse("Utilisateur supprimé avec succès."));
     }
 }

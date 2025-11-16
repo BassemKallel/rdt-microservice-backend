@@ -70,7 +70,6 @@ public class AnnouncementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Annonce non trouvée avec l'ID: " + id));
 
         if (!announcement.getMerchantId().equals(currentUserId)) {
-            // MISE À JOUR: Lève une exception spécifique
             throw new ForbiddenPermissionException("Vous ne pouvez modifier que vos propres annonces.");
         }
 
@@ -99,10 +98,8 @@ public class AnnouncementService {
         return announcementRepository.save(announcement);
     }
 
-    // Supprimer une annonce (Logique métier)
     public void deleteAnnouncement(Long id, Long currentUserId, Authentication authentication) {
         Announcement announcement = announcementRepository.findById(id)
-                // MISE À JOUR: Lève une exception spécifique
                 .orElseThrow(() -> new ResourceNotFoundException("Annonce non trouvée avec l'ID: " + id));
 
         // ADMIN peut tout supprimer
@@ -124,8 +121,6 @@ public class AnnouncementService {
             announcementRepository.delete(announcement);
             return;
         }
-
-        // MISE À JOUR: Lève une exception spécifique
         throw new ForbiddenPermissionException("Permission refusée pour supprimer cette ressource.");
     }
 }
