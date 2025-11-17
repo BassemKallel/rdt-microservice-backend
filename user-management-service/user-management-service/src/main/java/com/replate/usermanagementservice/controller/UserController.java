@@ -1,9 +1,6 @@
 package com.replate.usermanagementservice.controller;
 
-import com.replate.usermanagementservice.dto.AuthRequest;
-import com.replate.usermanagementservice.dto.AuthResponse;
-import com.replate.usermanagementservice.dto.MessageResponse;
-import com.replate.usermanagementservice.dto.RegisterRequest;
+import com.replate.usermanagementservice.dto.*;
 import com.replate.usermanagementservice.model.User;
 import com.replate.usermanagementservice.model.UserRole;
 import com.replate.usermanagementservice.service.UserService;
@@ -11,6 +8,8 @@ import com.replate.usermanagementservice.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -72,5 +71,21 @@ public class UserController {
     public ResponseEntity<Object> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok(new MessageResponse("Utilisateur supprimé avec succès."));
+    }
+    @PutMapping("/me/profile") // Utilise PUT pour la mise à jour
+    public ResponseEntity<User> updateMyProfile(
+            @Valid @RequestBody ProfileUpdateRequest request,
+            Authentication authentication) {
+
+        // Récupère l'email de l'utilisateur authentifié (le Principal)
+        String userEmail = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        // Récupère l'utilisateur complet depuis la base de données
+        User user = userService.authenticate(userEmail, null); // Astuce : réutiliser authenticate pour trouver par email
+
+        // Appelle le service pour mettre à jour les données
+        User updatedUser = userService.updateUserProfile(user.getId(), request);
+
+        return ResponseEntity.ok(updatedUser);
     }
 }

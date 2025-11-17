@@ -1,5 +1,6 @@
 package com.replate.usermanagementservice.service;
 
+import com.replate.usermanagementservice.dto.ProfileUpdateRequest;
 import com.replate.usermanagementservice.dto.RegisterRequest;
 import com.replate.usermanagementservice.exception.EmailAlreadyExistsException;
 import com.replate.usermanagementservice.exception.InvalidCredentialsException;
@@ -41,7 +42,6 @@ public class UserService {
                 if(request.getDocumentUrl() == null || request.getDocumentUrl().isEmpty()) {
                     throw new MissingRequiredFieldsException("Le document justificatif est requis pour le rôle Merchant.");
                 }
-                m.setValidated(true);
                 m.setDocumentUrl(request.getDocumentUrl());
                 newUser = m;
                 break;
@@ -55,6 +55,7 @@ public class UserService {
                 break;
             case INDIVIDUAL:
                 newUser = new IndividualBeneficiary();
+                newUser.setValidated(true);
                 break;
             case ADMIN:
                 newUser = new User();
@@ -119,5 +120,29 @@ public class UserService {
     public User getUserById(Long id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + id));
+    }
+
+
+    public User updateUserProfile(Long userId, ProfileUpdateRequest request) {
+
+        // 1. Trouver l'utilisateur
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + userId));
+
+        // 2. Mettre à jour les champs s'ils sont fournis (non nuls)
+        if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
+            user.setUsername(request.getUsername());
+        }
+
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+
+        if (request.getLocation() != null) {
+            user.setLocation(request.getLocation());
+        }
+
+        // 3. Sauvegarder les modifications
+        return userRepository.save(user);
     }
 }

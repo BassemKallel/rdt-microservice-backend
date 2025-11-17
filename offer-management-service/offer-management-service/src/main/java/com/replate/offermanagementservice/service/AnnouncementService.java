@@ -37,7 +37,6 @@ public class AnnouncementService {
     // Voir une annonce (public)
     public Announcement getById(Long id) {
         return announcementRepository.findById(id)
-                // MISE À JOUR: Lève une exception spécifique
                 .orElseThrow(() -> new ResourceNotFoundException("Annonce non trouvée avec l'ID: " + id));
     }
 

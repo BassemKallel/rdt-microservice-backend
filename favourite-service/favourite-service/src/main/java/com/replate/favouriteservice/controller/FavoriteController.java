@@ -1,7 +1,5 @@
 package com.replate.favouriteservice.controller;
 
-
-
 import com.replate.favouriteservice.model.Favorite;
 import com.replate.favouriteservice.service.FavoriteService;
 import org.springframework.http.ResponseEntity;

@@ -62,7 +62,7 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: miniopassword
-      MINIO_DEFAULT_BUCKETS: replate-bucket
+      MINIO_SERVER_URL: http://localhost:9000
     # COMMANDE CORRIGÉE : Indique que l'API est sur le port 9000 interne
     # et la console est sur le port 9001 interne.
     command: server /data --console-address ":9001"
