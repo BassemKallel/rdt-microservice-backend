@@ -33,7 +33,7 @@ public class JwtService {
         // Claim 2 : ID de l'utilisateur
         claims.put("userId", user.getId());
         // Claim 3 : Statut de validation
-        claims.put("validated", user.isValidated());
+        claims.put("status", user.getStatus().name());
 
         return Jwts.builder()
                 .setClaims(claims) // Utilise la map de claims

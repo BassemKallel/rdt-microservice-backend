@@ -1,47 +1,44 @@
 package com.replate.reservationtransactionservice.service;
 
-import com.replate.offermanagementservice.model.*;
 import com.replate.reservationtransactionservice.client.AnnouncementClient;
 import com.replate.reservationtransactionservice.dto.*;
-import com.replate.reservationtransactionservice.exception.PaymentFailedException;
-import com.replate.reservationtransactionservice.exception.UnauthorizedActionException;
+import com.replate.reservationtransactionservice.exception.*;
 import com.replate.reservationtransactionservice.model.*;
-import com.replate.reservationtransactionservice.repository.PaymentRepository;
 import com.replate.reservationtransactionservice.repository.TransactionRepository;
+import com.stripe.model.PaymentIntent; // ✅ Import indispensable pour Stripe
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReservationService {
 
     private final TransactionRepository transactionRepository;
-    private final PaymentRepository paymentRepository;
     private final StripePaymentService stripePaymentService;
     private final AnnouncementClient announcementClient;
 
-
     public ReservationService(TransactionRepository transactionRepository,
-                              PaymentRepository paymentRepository,
                               StripePaymentService stripePaymentService,
                               AnnouncementClient announcementClient) {
         this.transactionRepository = transactionRepository;
-        this.paymentRepository = paymentRepository;
         this.stripePaymentService = stripePaymentService;
         this.announcementClient = announcementClient;
-
     }
 
-    // Create reservation
+    // --- 1. CRÉATION ---
+    @Transactional
     public ReservationResponse createReservation(ReservationRequest request) {
-        Announcement announcement = announcementClient.getAnnouncementById(request.getAnnonceId());
+        // Récupération de l'annonce
+        AnnouncementResponse announcement = announcementClient.getAnnouncementById(request.getAnnonceId());
 
         if (announcement == null) {
-            throw new RuntimeException("Announcement not found");
+            throw new ResourceNotFoundException("Annonce non trouvée pour l'ID: " + request.getAnnonceId());
         }
 
         if (request.getQuantiteTransmise() == null || request.getQuantiteTransmise() <= 0) {
-            throw new RuntimeException("Quantity must be greater than zero.");
+            throw new BusinessException("La quantité doit être supérieure à zéro.");
         }
 
+        // Création de la transaction en base
         Transaction transaction = Transaction.builder()
                 .annonceId(request.getAnnonceId())
                 .userId(request.getUserId())
@@ -53,80 +50,102 @@ public class ReservationService {
 
         transactionRepository.save(transaction);
 
-        return new ReservationResponse(
-                transaction.getTransactionId(),
-                transaction.getStatus(),
-                true,
-                request.getAmount(),
-                request.getQuantiteTransmise(),
-                "Reservation created successfully"
-        );
+        return ReservationResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .status(transaction.getStatus())
+                .active(true)
+                .price(request.getAmount())
+                .availableQuantity(request.getQuantiteTransmise())
+                .message("Réservation créée avec succès")
+                .build();
     }
 
-    // Confirm reservation
+    // --- 2. CONFIRMATION (Avec Paiement Stripe) ---
+    @Transactional
     public ReservationResponse confirmReservation(ConfirmReservationRequest request) {
 
         Transaction transaction = transactionRepository.findById(request.getTransactionId())
-                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction non trouvée"));
 
+        // Vérification que c'est bien le marchand qui confirme
         if (request.getMerchantId() != null && !request.getMerchantId().equals(transaction.getMerchantId())) {
-            throw new UnauthorizedActionException("You are not allowed to confirm this transaction.");
+            throw new UnauthorizedActionException("Vous n'êtes pas autorisé à confirmer cette transaction.");
         }
 
-        // If SALE type → process payment with Stripe
-        if (transaction.getOfferType() == OfferType.SALE &&
-                transaction.getQuantiteTransmise() != null &&
-                transaction.getQuantiteTransmise() > 0 &&
-                transaction.getStatus() == TransactionStatus.PENDING_CONFIRMATION) {
+        String clientSecret = null;
+        String message = "Réservation confirmée";
 
-            Payment payment = stripePaymentService.processPayment(transaction, transaction.getQuantiteTransmise());
-            transaction.setPayment(payment);
+        // LOGIQUE VENTE : On déclenche le paiement Stripe
+        if (transaction.getOfferType() == OfferType.SALE) {
 
-            if (payment.getStatus() != PaymentStatus.COMPLETED) {
-                transaction.setStatus(TransactionStatus.CANCELLED);
-                transactionRepository.save(transaction);
-                throw new PaymentFailedException("Payment failed, reservation cancelled.");
+            // Si déjà confirmé, on ne fait rien
+            if (transaction.getStatus() == TransactionStatus.CONFIRMED) {
+                return ReservationResponse.builder()
+                        .transactionId(transaction.getTransactionId())
+                        .status(transaction.getStatus())
+                        .message("Déjà confirmée")
+                        .build();
             }
+
+            // 1. Récupérer le prix unitaire de l'annonce pour calculer le total
+            AnnouncementResponse announcement = announcementClient.getAnnouncementById(transaction.getAnnonceId());
+            if (announcement == null) {
+                throw new ResourceNotFoundException("Impossible de récupérer l'annonce pour le calcul du prix.");
+            }
+
+            // Calcul du prix total (Prix * Quantité)
+            Float totalAmount = (float) (announcement.getPrice() * transaction.getQuantiteTransmise());
+
+            // 2. Appeler Stripe pour créer l'intention (PaymentIntent)
+            // ✅ C'est ici qu'on appelle la NOUVELLE méthode createPaymentIntent
+            PaymentIntent intent = stripePaymentService.createPaymentIntent(transaction, totalAmount);
+
+            // 3. Récupérer le secret pour le frontend
+            clientSecret = intent.getClientSecret();
+            message = "Paiement requis. Utilisez le clientSecret pour finaliser.";
+
+            // On laisse le statut en PENDING_CONFIRMATION en attendant le Webhook
+
+        } else {
+            // LOGIQUE DONATION : Confirmation immédiate
+            transaction.setStatus(TransactionStatus.CONFIRMED);
+            transactionRepository.save(transaction);
         }
 
-        transaction.setStatus(TransactionStatus.CONFIRMED);
-        transactionRepository.save(transaction);
-
-        return new ReservationResponse(
-                transaction.getTransactionId(),
-                transaction.getStatus(),
-                true,
-                transaction.getQuantiteTransmise(),
-                transaction.getQuantiteTransmise(),
-                "Reservation confirmed successfully"
-        );
+        return ReservationResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .status(transaction.getStatus())
+                .active(true)
+                .availableQuantity(transaction.getQuantiteTransmise())
+                .message(message)
+                .paymentClientSecret(clientSecret) // ✅ Le secret est envoyé ici
+                .build();
     }
 
-    // Reject reservation
+    // --- 3. REJET ---
+    @Transactional
     public ReservationResponse rejectReservation(ConfirmReservationRequest request) {
-
         Transaction transaction = transactionRepository.findById(request.getTransactionId())
-                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction non trouvée"));
 
         if (request.getMerchantId() != null && !request.getMerchantId().equals(transaction.getMerchantId())) {
-            throw new UnauthorizedActionException("You are not allowed to reject this transaction.");
+            throw new UnauthorizedActionException("Vous n'êtes pas autorisé à rejeter cette transaction.");
         }
 
         if (transaction.getStatus() == TransactionStatus.CONFIRMED ||
                 transaction.getStatus() == TransactionStatus.CANCELLED) {
-            throw new RuntimeException("This reservation cannot be rejected.");
+            throw new BusinessException("Cette réservation est déjà traitée et ne peut être rejetée.");
         }
 
         transaction.setStatus(TransactionStatus.CANCELLED);
         transactionRepository.save(transaction);
 
-        return new ReservationResponse(
-                transaction.getTransactionId(),
-                transaction.getStatus(),
-                true,
-                transaction.getQuantiteTransmise(),
-                transaction.getQuantiteTransmise(),
-                "Reservation rejected successfully"
-        );
+        return ReservationResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .status(transaction.getStatus())
+                .active(false)
+                .availableQuantity(transaction.getQuantiteTransmise())
+                .message("Réservation rejetée avec succès")
+                .build();
     }
 }

@@ -1,7 +1,7 @@
 package com.replate.reservationtransactionservice.controller;
 
 import com.replate.reservationtransactionservice.dto.PaymentResponse;
-import com.replate.reservationtransactionservice.exception.PaymentFailedException;
+import com.replate.reservationtransactionservice.exception.ResourceNotFoundException; // Import correct
 import com.replate.reservationtransactionservice.model.Payment;
 import com.replate.reservationtransactionservice.repository.PaymentRepository;
 import org.springframework.http.ResponseEntity;
@@ -17,35 +17,30 @@ public class PaymentController {
         this.paymentRepository = paymentRepository;
     }
 
-    // Get payment by transaction ID
     @GetMapping("/transaction/{transactionId}")
     public ResponseEntity<PaymentResponse> getPaymentByTransaction(@PathVariable Long transactionId) {
         Payment payment = paymentRepository.findByTransaction_TransactionId(transactionId)
-                .orElseThrow(() -> new PaymentFailedException("Payment not found for transaction: " + transactionId));
+                // CORRECTION : Utiliser ResourceNotFoundException (404) au lieu de PaymentFailedException
+                .orElseThrow(() -> new ResourceNotFoundException("Paiement introuvable pour la transaction: " + transactionId));
 
-        PaymentResponse response = PaymentResponse.builder()
-                .paymentId(payment.getPaymentId())
-                .status(payment.getStatus())
-                .providerPaymentId(payment.getProviderPaymentId())
-                .message("Payment retrieved successfully")
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(mapToResponse(payment));
     }
 
-    // Get payment by Stripe provider ID
     @GetMapping("/provider/{providerPaymentId}")
     public ResponseEntity<PaymentResponse> getPaymentByProviderId(@PathVariable String providerPaymentId) {
         Payment payment = paymentRepository.findByProviderPaymentId(providerPaymentId)
-                .orElseThrow(() -> new PaymentFailedException("Payment not found for provider ID: " + providerPaymentId));
+                // CORRECTION : 404
+                .orElseThrow(() -> new ResourceNotFoundException("Paiement introuvable pour l'ID fournisseur: " + providerPaymentId));
 
-        PaymentResponse response = PaymentResponse.builder()
+        return ResponseEntity.ok(mapToResponse(payment));
+    }
+
+    private PaymentResponse mapToResponse(Payment payment) {
+        return PaymentResponse.builder()
                 .paymentId(payment.getPaymentId())
                 .status(payment.getStatus())
                 .providerPaymentId(payment.getProviderPaymentId())
                 .message("Payment retrieved successfully")
                 .build();
-
-        return ResponseEntity.ok(response);
     }
 }

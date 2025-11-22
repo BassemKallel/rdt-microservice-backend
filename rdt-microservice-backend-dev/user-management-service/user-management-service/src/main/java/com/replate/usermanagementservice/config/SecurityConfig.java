@@ -22,21 +22,13 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
-    // ❌ private final PasswordEncoder passwordEncoder; // SUPPRIMER CE CHAMP
 
-    /**
-     * Crée le Bean PasswordEncoder.
-     * C'est la source unique pour le hachage.
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * CORRECTION DU CONSTRUCTEUR :
-     * Ne pas injecter PasswordEncoder ici.
-     */
+
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, UserDetailsService userDetailsService) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;

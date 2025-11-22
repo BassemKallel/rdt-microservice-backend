@@ -5,14 +5,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.antlr.v4.runtime.misc.NotNull;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class ReservationResponse {
-
-    @NotNull
     private Long transactionId;       // ID of the created transaction
 
     private TransactionStatus status;
@@ -20,9 +18,10 @@ public class ReservationResponse {
     private Float price;
     private Float availableQuantity;
     private String message;
+    private String paymentClientSecret;
 
-    public boolean isActive() { return active != null && active; }
-    public boolean hasEnoughQuantity(Float q) {
-        return availableQuantity != null && q != null && availableQuantity >= q;
+
+    public boolean isActive() {
+        return Boolean.TRUE.equals(active);
     }
 }

@@ -3,31 +3,33 @@ package com.replate.offermanagementservice.controller;
 import com.replate.offermanagementservice.dto.AnnouncementRequest;
 import com.replate.offermanagementservice.model.Announcement;
 import com.replate.offermanagementservice.service.AnnouncementService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/offers")
 public class AnnouncementController {
 
     private final AnnouncementService announcementService;
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnnouncementController.class);
-
+    private static final Logger log = LoggerFactory.getLogger(AnnouncementController.class);
 
     public AnnouncementController(AnnouncementService announcementService) {
         this.announcementService = announcementService;
     }
 
-    // PUBLIC - Liste
+    // --- LECTURE ---
+
     @GetMapping("/browse")
     public ResponseEntity<List<Announcement>> browse() {
         return ResponseEntity.ok(announcementService.getAllAnnouncements());
     }
 
-    // PUBLIC - Voir une annonce
     @GetMapping("/{id}")
     public ResponseEntity<Announcement> getById(@PathVariable Long id) {
         return ResponseEntity.ok(announcementService.getById(id));
@@ -39,21 +41,28 @@ public class AnnouncementController {
         return ResponseEntity.ok(announcementService.getAnnouncementsByMerchantId(merchantId));
     }
 
-    // MERCHANT - Créer
+
     @PostMapping("/create")
     public ResponseEntity<Announcement> create(
             @RequestBody AnnouncementRequest request,
-            @RequestHeader("X-Is-Validated") Boolean isValidated,
             Authentication authentication) {
 
         Long merchantId = (Long) authentication.getPrincipal();
 
-        // Le service lèvera AccountNotValidatedException si non valide (renvoie 403).
+        @SuppressWarnings("unchecked")
+        Map<String, String> details = (Map<String, String>) authentication.getDetails();
+
+        String status = details != null ? details.getOrDefault("status", "PENDING") : "PENDING";
+
+        boolean isValidated = "ACTIVE".equalsIgnoreCase(status) || "true".equalsIgnoreCase(status);
+
+        log.info("Création Annonce - MerchantID: {}, Status reçu: {}, Validé: {}", merchantId, status, isValidated);
+
         Announcement createdAnnouncement = announcementService.createAnnouncement(request, merchantId, isValidated);
+
         return ResponseEntity.ok(createdAnnouncement);
     }
 
-    // MERCHANT - Modifier
     @PutMapping("/update/{id}")
     public ResponseEntity<Announcement> update(
             @PathVariable Long id,
@@ -61,22 +70,20 @@ public class AnnouncementController {
             Authentication authentication) {
 
         Long userId = (Long) authentication.getPrincipal();
+        log.info("Mise à jour annonce #{} par User #{}", id, userId);
 
-        Announcement updatedAnnouncement = announcementService.updateAnnouncement(id, request, userId);
-        return ResponseEntity.ok(updatedAnnouncement);
+        return ResponseEntity.ok(announcementService.updateAnnouncement(id, request, userId));
     }
 
-    // ADMIN ou MERCHANT - Supprimer
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> delete(
             @PathVariable Long id,
             Authentication authentication) {
 
         Long userId = (Long) authentication.getPrincipal();
-        log.info("DELETE Request - ID: {}, UserId: {}, Role: {}", id, userId, authentication.getAuthorities());
-
+        log.info("Suppression annonce #{} par User #{}", id, userId);
 
         announcementService.deleteAnnouncement(id, userId, authentication);
-        return ResponseEntity.ok("Annonce supprimée");
+        return ResponseEntity.ok("Annonce supprimée avec succès.");
     }
 }

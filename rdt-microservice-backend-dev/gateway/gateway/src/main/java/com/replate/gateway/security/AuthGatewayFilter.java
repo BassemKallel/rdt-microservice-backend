@@ -24,14 +24,16 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
 
     private final GatewayJwtUtil jwtUtil;
 
-    // Liste des chemins publics qui ne nécessitent pas de JWT
+    // Liste des chemins publics
     private static final List<String> OPEN_ENDPOINTS = List.of(
             "/api/v1/users/register",
             "/api/v1/users/login",
             "/api/v1/offers/browse",
             "/api/v1/offers/search",
-            "/api/v1/files/upload"
-            // Ajoutez ici d'autres routes publiques comme /actuator/health, etc.
+            "/api/v1/offers/public",
+            "/api/v1/files/upload",
+            "/api/v1/reservations/create", // Souvent public pour initier (selon votre flux)
+            "/actuator/health"
     );
 
     public AuthGatewayFilter(GatewayJwtUtil jwtUtil) {
@@ -44,6 +46,7 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
         String path = request.getURI().getPath();
 
         // 1. Contourner les endpoints publics
+        // Vérification plus large (startsWith) pour éviter les bloquages sur les sous-ressources
         if (OPEN_ENDPOINTS.stream().anyMatch(path::startsWith)) {
             return chain.filter(exchange);
         }
@@ -60,52 +63,55 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
             // 3. Valider le token et extraire les claims
             Claims claims = jwtUtil.validateAndExtractClaims(token);
 
-            // 🚨 CORRECTION : Gestion des types (Integer/Boolean)
+            // Extraction sécurisée des claims
+            String userId = String.valueOf(claims.get("userId"));
+            String role = String.valueOf(claims.get("role"));
 
-            // Récupère le userId comme Integer (correspondant à jwt.io)
-            Integer userId = claims.get("userId", Integer.class);
-            // Récupère le rôle
-            String role = claims.get("role", String.class);
-            // Récupère la validation comme Boolean
-            Boolean isValidated = claims.get("validated", Boolean.class);
+            // Récupération du statut : on tente "status" (nouveau) puis "validated" (ancien)
+            Object statusObj = claims.get("status");
+            String status;
 
-            // Vérification que les claims critiques ne sont pas nuls
-            if (userId == null || role == null || isValidated == null) {
-                throw new JwtException("Token claims are incomplete (userId, role, or validated is missing)");
+            if (statusObj != null) {
+                status = String.valueOf(statusObj);
+            } else {
+                // Fallback sur l'ancien champ booléen
+                Object validatedObj = claims.get("validated");
+                if (validatedObj != null && Boolean.parseBoolean(String.valueOf(validatedObj))) {
+                    status = "ACTIVE";
+                } else {
+                    status = "PENDING";
+                }
             }
 
-            // 4. Mutate la requête en ajoutant les claims comme en-têtes (conversion sûre)
+            // 4. Mutate la requête en ajoutant les claims comme en-têtes
             ServerHttpRequest mutatedRequest = request.mutate()
-                    .header("X-User-Id", userId.toString())
+                    .header("X-User-Id", userId)
                     .header("X-User-Role", role)
-                    .header("X-Is-Validated", isValidated.toString())
+                    .header("X-User-Status", status) // Le header attendu par les services
                     .build();
 
-            log.debug("✅ JWT validé. Headers injectés pour UserID: {}", userId);
+            log.debug("✅ JWT validé. Injection Headers -> ID: {}, Role: {}, Status: {}", userId, role, status);
 
             // 5. Continuer la chaîne avec la nouvelle requête
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
 
         } catch (JwtException e) {
-            log.warn("❌ JWT Invalide pour la requête {} : {}", path, e.getMessage());
-            return onError(exchange, "Invalid or expired authentication token", HttpStatus.UNAUTHORIZED);
+            log.warn("❌ JWT Invalide: {}", e.getMessage());
+            return onError(exchange, "Invalid Token", HttpStatus.UNAUTHORIZED);
         } catch (Exception e) {
-            // Capture générale pour les erreurs de conversion
-            log.error("❌ Erreur inattendue lors du filtrage JWT : {}", e.getMessage());
-            return onError(exchange, "Internal Server Error during token processing", HttpStatus.INTERNAL_SERVER_ERROR);
+            log.error("❌ Erreur Gateway: {}", e.getMessage());
+            return onError(exchange, "Gateway Error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     private Mono<Void> onError(ServerWebExchange exchange, String err, HttpStatus httpStatus) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(httpStatus);
-        // Vous pouvez aussi ajouter un body d'erreur ici si nécessaire
         return response.setComplete();
     }
 
-    // Le filtre doit s'exécuter avant le filtre de routage par défaut.
     @Override
     public int getOrder() {
-        return -100; // Très haute priorité
+        return -100; // Priorité haute
     }
 }

@@ -1,15 +1,15 @@
 package com.replate.usermanagementservice.controller;
 
-import com.replate.usermanagementservice.dto.AuthRequest;
-import com.replate.usermanagementservice.dto.AuthResponse;
-import com.replate.usermanagementservice.dto.MessageResponse;
-import com.replate.usermanagementservice.dto.RegisterRequest;
+import com.replate.usermanagementservice.dto.*;
 import com.replate.usermanagementservice.model.User;
 import com.replate.usermanagementservice.model.UserRole;
+import com.replate.usermanagementservice.repository.UserRepository;
 import com.replate.usermanagementservice.service.UserService;
 import com.replate.usermanagementservice.security.JwtService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -27,7 +27,6 @@ public class UserController {
     @PostMapping("/register")
     public ResponseEntity<Object> registerUser(@RequestBody RegisterRequest request) {
 
-        // Le GlobalExceptionHandler intercepte les erreurs (EmailExists, MissingFields, IllegalArgument)
         User user = userService.registerNewUser(request);
 
         // Renvoyer le message approprié en fonction du rôle
@@ -54,5 +53,39 @@ public class UserController {
         );
 
         return ResponseEntity.ok(authResponse);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<User> getMyProfile() {
+        User user = getCurrentUser();
+        return ResponseEntity.ok(user);
+    }
+
+
+    @PutMapping("/me")
+    public ResponseEntity<User> updateUser(@RequestBody UpdateProfileRequest user) {
+        User existingUser = getCurrentUser();
+        User updatedUser = userService.updateUser(existingUser.getId(),user);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    @PostMapping("/me/password")
+    public ResponseEntity<MessageResponse> updateUserPassword(@RequestBody ChangePasswordRequest newPassword) {
+        User user = getCurrentUser();
+
+        userService.changePassword(user.getId(), newPassword.getOldPassword(), newPassword.getNewPassword());
+        return ResponseEntity.ok(new MessageResponse("Mot de passe modifié avec succès."));
+    }
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName(); // Le username dans le token est l'email
+        return userService.findByEmail(email);
+    }
+
+
+    @GetMapping("{id}")
+    public User getUser(@PathVariable Long id) {
+        return userService.getUserById(id);
     }
 }

@@ -1,5 +1,5 @@
 package com.replate.usermanagementservice.repository;
-import com.replate.usermanagementservice.dto.UserResponse;
+import com.replate.usermanagementservice.model.AccountStatus;
 import com.replate.usermanagementservice.model.User;
 import com.replate.usermanagementservice.model.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,4 +11,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
     List<User> findAllByIsValidatedFalseAndRoleIn(List<UserRole> roles);
+    List<User> findAllByStatusAndRoleIn(AccountStatus status, List<UserRole> roles);
 }

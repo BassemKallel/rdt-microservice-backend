@@ -1,16 +1,19 @@
 package com.replate.offermanagementservice.service;
 
 import com.replate.offermanagementservice.dto.AnnouncementRequest;
-// Imports pour les nouvelles exceptions
 import com.replate.offermanagementservice.exception.AccountNotValidatedException;
 import com.replate.offermanagementservice.exception.ForbiddenPermissionException;
 import com.replate.offermanagementservice.exception.ResourceNotFoundException;
 import com.replate.offermanagementservice.model.Announcement;
 import com.replate.offermanagementservice.model.ModerationStatus;
 import com.replate.offermanagementservice.repository.AnnouncementRepository;
+import com.replate.offermanagementservice.kafka.AnnouncementEventProducer; // Optional: if you want to emit events
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,114 +21,114 @@ import java.util.List;
 @Service
 public class AnnouncementService {
 
-    private final AnnouncementRepository announcementRepository;
+    private static final Logger log = LoggerFactory.getLogger(AnnouncementService.class);
 
-    public AnnouncementService(AnnouncementRepository announcementRepository) {
+    private final AnnouncementRepository announcementRepository;
+    private final AnnouncementEventProducer eventProducer; // Optional
+
+    public AnnouncementService(AnnouncementRepository announcementRepository, AnnouncementEventProducer eventProducer) {
         this.announcementRepository = announcementRepository;
+        this.eventProducer = eventProducer;
     }
 
-    // Lister toutes les annonces (public)
+    // --- LECTURE ---
+
     public List<Announcement> getAllAnnouncements() {
         return announcementRepository.findAll();
     }
 
-    // Lister les annonces pour un marchand spécifique
     public List<Announcement> getAnnouncementsByMerchantId(Long merchantId) {
         return announcementRepository.findAllByMerchantId(merchantId);
     }
 
-    // Voir une annonce (public)
     public Announcement getById(Long id) {
         return announcementRepository.findById(id)
-                // MISE À JOUR: Lève une exception spécifique
                 .orElseThrow(() -> new ResourceNotFoundException("Annonce non trouvée avec l'ID: " + id));
     }
 
-    // Créer une annonce (MERCHANT)
+    // --- ÉCRITURE ---
+
+    @Transactional
     public Announcement createAnnouncement(AnnouncementRequest request, Long merchantId, Boolean isValidated) {
+        // 1. Vérification du statut du compte
         if (isValidated == null || !isValidated) {
-            // MISE À JOUR: Lève une exception spécifique
-            throw new AccountNotValidatedException("Le compte n'est pas validé et ne peut pas créer d'annonce.");
+            log.warn("Tentative de création d'annonce par un compte non validé (ID: {})", merchantId);
+            throw new AccountNotValidatedException("Votre compte n'est pas validé. Vous ne pouvez pas publier d'offres.");
         }
 
+        // 2. Création de l'entité
         Announcement announcement = new Announcement();
         announcement.setMerchantId(merchantId);
         announcement.setTitle(request.getTitle());
         announcement.setDescription(request.getDescription());
         announcement.setPrice(request.getPrice());
         announcement.setAnnouncementType(request.getAnnouncementType());
-        announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
         announcement.setImageUrl1(request.getImageUrl1());
-        announcement.setUpdatedAt(LocalDateTime.now());
-        announcement.setCreatedAt(LocalDateTime.now());
         announcement.setExpiryDate(request.getExpiryDate());
 
-        return announcementRepository.save(announcement);
+        // Par défaut, une nouvelle annonce peut nécessiter une modération (selon vos règles)
+        announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+
+        announcement.setCreatedAt(LocalDateTime.now());
+        announcement.setUpdatedAt(LocalDateTime.now());
+
+        Announcement saved = announcementRepository.save(announcement);
+        log.info("Annonce créée avec succès (ID: {}) par Marchand (ID: {})", saved.getId(), merchantId);
+
+        // 3. (Optionnel) Envoyer un événement Kafka
+        if (eventProducer != null) {
+            eventProducer.sendAnnouncementEvent(saved, "ANNOUNCEMENT_CREATED");
+        }
+
+        return saved;
     }
 
-    // Modifier une annonce (MERCHANT - propriétaire uniquement)
+    @Transactional
     public Announcement updateAnnouncement(Long id, AnnouncementRequest request, Long currentUserId) {
-        Announcement announcement = announcementRepository.findById(id)
-                // MISE À JOUR: Lève une exception spécifique
-                .orElseThrow(() -> new ResourceNotFoundException("Annonce non trouvée avec l'ID: " + id));
+        Announcement announcement = getById(id);
 
+        // Vérification de la propriété
         if (!announcement.getMerchantId().equals(currentUserId)) {
-            // MISE À JOUR: Lève une exception spécifique
             throw new ForbiddenPermissionException("Vous ne pouvez modifier que vos propres annonces.");
         }
 
-        // ... (logique de mise à jour partielle)
-        if (request.getTitle() != null && !request.getTitle().trim().isEmpty()) {
-            announcement.setTitle(request.getTitle());
-        }
-        if (request.getDescription() != null && !request.getDescription().trim().isEmpty()) {
-            announcement.setDescription(request.getDescription());
-        }
-        if (request.getPrice() != null) {
-            announcement.setPrice(request.getPrice());
-        }
-        if (request.getAnnouncementType() != null) {
-            announcement.setAnnouncementType(request.getAnnouncementType());
-        }
-        if (request.getImageUrl1() != null && !request.getImageUrl1().trim().isEmpty()) {
-            announcement.setImageUrl1(request.getImageUrl1());
-        }
-        if (request.getExpiryDate() != null) {
-            announcement.setExpiryDate(request.getExpiryDate());
-        }
+        // Mise à jour partielle (Patch-like logic)
+        if (request.getTitle() != null) announcement.setTitle(request.getTitle());
+        if (request.getDescription() != null) announcement.setDescription(request.getDescription());
+        if (request.getPrice() != null) announcement.setPrice(request.getPrice());
+        if (request.getAnnouncementType() != null) announcement.setAnnouncementType(request.getAnnouncementType());
+        if (request.getImageUrl1() != null) announcement.setImageUrl1(request.getImageUrl1());
+        if (request.getExpiryDate() != null) announcement.setExpiryDate(request.getExpiryDate());
 
-        announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        // Réinitialiser la modération si le contenu change ? (Règle métier à décider)
+        // announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+
         announcement.setUpdatedAt(LocalDateTime.now());
+
         return announcementRepository.save(announcement);
     }
 
-    // Supprimer une annonce (Logique métier)
+    @Transactional
     public void deleteAnnouncement(Long id, Long currentUserId, Authentication authentication) {
-        Announcement announcement = announcementRepository.findById(id)
-                // MISE À JOUR: Lève une exception spécifique
-                .orElseThrow(() -> new ResourceNotFoundException("Annonce non trouvée avec l'ID: " + id));
+        Announcement announcement = getById(id);
 
-        // ADMIN peut tout supprimer
+        // Vérification des permissions : Soit ADMIN, soit PROPRIÉTAIRE
         boolean isAdmin = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(role -> role.equals("ROLE_ADMIN"));
 
-        if (isAdmin) {
-            announcementRepository.delete(announcement);
-            return;
+        boolean isOwner = announcement.getMerchantId().equals(currentUserId);
+
+        if (!isAdmin && !isOwner) {
+            throw new ForbiddenPermissionException("Vous n'avez pas la permission de supprimer cette annonce.");
         }
 
-        // MERCHANT peut supprimer seulement ses annonces
-        boolean isMerchant = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> role.equals("ROLE_MERCHANT"));
+        announcementRepository.delete(announcement);
+        log.info("Annonce #{} supprimée par User #{}", id, currentUserId);
 
-        if (isMerchant && announcement.getMerchantId().equals(currentUserId)) {
-            announcementRepository.delete(announcement);
-            return;
+        // (Optionnel) Kafka Event
+        if (eventProducer != null) {
+            eventProducer.sendAnnouncementEvent(announcement, "ANNOUNCEMENT_DELETED");
         }
-
-        // MISE À JOUR: Lève une exception spécifique
-        throw new ForbiddenPermissionException("Permission refusée pour supprimer cette ressource.");
     }
 }

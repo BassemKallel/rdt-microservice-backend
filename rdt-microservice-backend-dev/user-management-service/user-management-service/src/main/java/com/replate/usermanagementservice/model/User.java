@@ -40,8 +40,8 @@ public class User {
     @Column(nullable = true)
     private String PhoneNumber;
 
-
-
-
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountStatus status = AccountStatus.PENDING;
 
 }

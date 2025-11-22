@@ -7,9 +7,9 @@ import org.springframework.cloud.openfeign.FeignClient;
 
 
 //Feign client for communicating with the Offer Management Service.
-@FeignClient(name = "offer-management-service", url = "${oms.service.url}")
+// Add contextId to avoid bean name conflicts
+@FeignClient(name = "offer-management-service", url = "${oms.service.url}", contextId = "offerClient")
 public interface OfferClient {
     @GetMapping("/offers/{id}")
     ReservationResponse getAnnouncementById(@PathVariable("id") Long annonceId);
 }
-

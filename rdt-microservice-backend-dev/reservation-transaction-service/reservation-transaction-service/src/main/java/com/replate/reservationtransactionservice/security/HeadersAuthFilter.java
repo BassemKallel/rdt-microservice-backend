@@ -1,4 +1,4 @@
-package com.replate.offermanagementservice.security;
+package com.replate.reservationtransactionservice.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,14 +10,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class HeadersAuthFilter extends OncePerRequestFilter {
@@ -28,37 +27,38 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
+        // Récupération des headers injectés par la Gateway
         final String userId = request.getHeader("X-User-Id");
         final String userRole = request.getHeader("X-User-Role");
-        String userStatus = request.getHeader("X-User-Status");
-
-
-        log.debug("--- [OMS HeadersAuthFilter] Headers Reçus ---");
-        log.debug("X-User-Id: {}", userId);
-        log.debug("X-User-Status: {}", userStatus);
 
         if (userId != null && userRole != null) {
-            String cleanedUserRole = userRole.trim();
-            if (!cleanedUserRole.startsWith("ROLE_")) {
-                cleanedUserRole = "ROLE_" + cleanedUserRole;
+            log.debug("Authentification via Headers - UserID: {}, Role: {}", userId, userRole);
+
+            String role = userRole.trim();
+            if (!role.startsWith("ROLE_")) {
+                role = "ROLE_" + role;
             }
 
             List<GrantedAuthority> authorities = Collections.singletonList(
-                    new SimpleGrantedAuthority(cleanedUserRole)
+                    new SimpleGrantedAuthority(role)
             );
 
+            // Création de l'objet d'authentification
+            // Principal = userId (Long) pour faciliter l'utilisation dans les contrôleurs
             UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    Long.valueOf(userId.trim()),
-                    null,
-                    authorities
+                    Long.valueOf(userId.trim()), // Principal
+                    null,                        // Credentials (null car pré-authentifié)
+                    authorities                  // Autorités
             );
 
-            Map<String, String> details = new HashMap<>();
-            details.put("status", userStatus != null ? userStatus : "PENDING");
-            authToken.setDetails(details);
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
+            // Injection dans le contexte de sécurité
             SecurityContextHolder.getContext().setAuthentication(authToken);
+        } else {
+            log.debug("Headers d'authentification manquants (X-User-Id ou X-User-Role).");
         }
+
         filterChain.doFilter(request, response);
     }
 }
