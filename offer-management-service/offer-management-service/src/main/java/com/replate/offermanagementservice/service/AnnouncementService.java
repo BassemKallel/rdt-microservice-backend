@@ -3,6 +3,7 @@ package com.replate.offermanagementservice.service;
 import com.replate.offermanagementservice.dto.AnnouncementRequest;
 import com.replate.offermanagementservice.exception.AccountNotValidatedException;
 import com.replate.offermanagementservice.exception.ForbiddenPermissionException;
+import com.replate.offermanagementservice.exception.InsufficientStockException;
 import com.replate.offermanagementservice.exception.ResourceNotFoundException;
 import com.replate.offermanagementservice.model.Announcement;
 import com.replate.offermanagementservice.model.ModerationStatus;
@@ -56,7 +57,6 @@ public class AnnouncementService {
             throw new AccountNotValidatedException("Votre compte n'est pas validé. Vous ne pouvez pas publier d'offres.");
         }
 
-        // 2. Création de l'entité
         Announcement announcement = new Announcement();
         announcement.setMerchantId(merchantId);
         announcement.setTitle(request.getTitle());
@@ -66,9 +66,10 @@ public class AnnouncementService {
         announcement.setImageUrl1(request.getImageUrl1());
         announcement.setExpiryDate(request.getExpiryDate());
 
-        // Par défaut, une nouvelle annonce peut nécessiter une modération (selon vos règles)
-        announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
-
+        announcement.setModerationStatus(ModerationStatus.ACCEPTED);
+        announcement.setUnit(request.getUnit());
+        announcement.setStock(request.getStock());
+        announcement.setCategory(request.getCategory());
         announcement.setCreatedAt(LocalDateTime.now());
         announcement.setUpdatedAt(LocalDateTime.now());
 
@@ -99,9 +100,10 @@ public class AnnouncementService {
         if (request.getAnnouncementType() != null) announcement.setAnnouncementType(request.getAnnouncementType());
         if (request.getImageUrl1() != null) announcement.setImageUrl1(request.getImageUrl1());
         if (request.getExpiryDate() != null) announcement.setExpiryDate(request.getExpiryDate());
+        if (request.getCategory() != null) announcement.setCategory(request.getCategory());
+        if (request.getUnit() != null) announcement.setUnit(request.getUnit());
+        if (request.getStock() != null) announcement.setStock(request.getStock());
 
-        // Réinitialiser la modération si le contenu change ? (Règle métier à décider)
-        // announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
 
         announcement.setUpdatedAt(LocalDateTime.now());
 
@@ -112,7 +114,6 @@ public class AnnouncementService {
     public void deleteAnnouncement(Long id, Long currentUserId, Authentication authentication) {
         Announcement announcement = getById(id);
 
-        // Vérification des permissions : Soit ADMIN, soit PROPRIÉTAIRE
         boolean isAdmin = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(role -> role.equals("ROLE_ADMIN"));
@@ -126,9 +127,24 @@ public class AnnouncementService {
         announcementRepository.delete(announcement);
         log.info("Annonce #{} supprimée par User #{}", id, currentUserId);
 
-        // (Optionnel) Kafka Event
         if (eventProducer != null) {
             eventProducer.sendAnnouncementEvent(announcement, "ANNOUNCEMENT_DELETED");
         }
+    }
+
+    @Transactional
+    public void decreaseStock(Long announcementId, Integer quantity) {
+        Announcement announcement = getById(announcementId);
+
+        if (announcement.getStock() < quantity) {
+            throw new InsufficientStockException("Stock insuffisant pour l'annonce " + announcementId +
+                    ". Disponible: " + announcement.getStock() +
+                    ", Demandé: " + quantity);
+        }
+
+        announcement.setStock(announcement.getStock() - quantity);
+        announcementRepository.save(announcement);
+
+        log.info("Stock décrémenté pour l'annonce {}. Nouveau stock: {}", announcementId, announcement.getStock());
     }
 }

@@ -36,6 +36,7 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
         log.debug("--- [OMS HeadersAuthFilter] Headers Reçus ---");
         log.debug("X-User-Id: {}", userId);
         log.debug("X-User-Status: {}", userStatus);
+        log.debug("X-User-Role: {}", userRole);
 
         if (userId != null && userRole != null) {
             String cleanedUserRole = userRole.trim();

@@ -1,34 +1,42 @@
 version: '3.8'
 services:
   # ----------------------------------------
-  # 1. PostgreSQL (Base de données relationnelle pour UMS, OMS, RTS)
+  # 1. PostgreSQL
   # ----------------------------------------
   postgres:
     image: postgres:14
     container_name: rdt_postgres
-    # Variables d'environnement utilisées par les microservices
     environment:
       POSTGRES_USER: rdtuser
       POSTGRES_PASSWORD: rdtpassword
       POSTGRES_DB: rdt_db
     ports:
-      - "5432:5432"
+      - "5432:5432" # Accessible via localhost:5432 pour vos apps IntelliJ
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rdt-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rdtuser -d rdt_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ----------------------------------------
-  # 2. MongoDB (Base de données NoSQL pour Reporting et Analytics)
+  # 2. MongoDB
   # ----------------------------------------
   mongodb:
     image: mongo:latest
     container_name: rdt_mongodb
     ports:
-      - "27017:27017"
+      - "27017:27017" # Accessible via localhost:27017
     volumes:
       - mongo_data:/data/db
+    networks:
+      - rdt-network
 
   # ----------------------------------------
-  # 3. Kafka (Message Broker pour la communication asynchrone)
+  # 3. Kafka & Zookeeper
   # ----------------------------------------
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -37,6 +45,8 @@ services:
       - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - rdt-network
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -44,30 +54,61 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "9092:9092" # Accessible via localhost:9092
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # Adresse essentielle pour les microservices Spring Boot
+      # Configuration hybride : Permet l'accès depuis Docker ET depuis IntelliJ (localhost)
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - rdt-network
+    healthcheck:
+      test: nc -z localhost 9092 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+  # ----------------------------------------
+  # 4. MinIO (S3)
+  # ----------------------------------------
   minio:
     image: minio/minio
     container_name: rdt_minio
     ports:
-      - "9000:9000"  # API S3 (Le port de l'API)
-      - "9001:9001"  # Console d'administration (Le port du navigateur)
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: miniopassword
       MINIO_DEFAULT_BUCKETS: replate-bucket
-    # COMMANDE CORRIGÉE : Indique que l'API est sur le port 9000 interne
-    # et la console est sur le port 9001 interne.
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    networks:
+      - rdt-network
+
+  # ----------------------------------------
+  # 5. Stripe CLI (Optionnel en Docker)
+  # ----------------------------------------
+  # Note : En mode dev IntelliJ, il est souvent plus simple de lancer Stripe
+  # dans un terminal PowerShell séparé, mais voici la config Docker si besoin.
+  stripe-cli:
+    image: stripe/stripe-cli
+    container_name: rdt_stripe_cli
+    # Important : "host.docker.internal" permet de taper sur votre IntelliJ (Windows) depuis Docker
+    command: listen --forward-to http://host.docker.internal:8084/webhook --api-key ${STRIPE_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - rdt-network
+
+networks:
+  rdt-network:
+    driver: bridge
+
 volumes:
   postgres_data:
   mongo_data:

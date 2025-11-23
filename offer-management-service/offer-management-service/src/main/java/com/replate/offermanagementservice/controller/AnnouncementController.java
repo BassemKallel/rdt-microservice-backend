@@ -3,6 +3,7 @@ package com.replate.offermanagementservice.controller;
 import com.replate.offermanagementservice.dto.AnnouncementRequest;
 import com.replate.offermanagementservice.model.Announcement;
 import com.replate.offermanagementservice.service.AnnouncementService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -44,7 +45,7 @@ public class AnnouncementController {
 
     @PostMapping("/create")
     public ResponseEntity<Announcement> create(
-            @RequestBody AnnouncementRequest request,
+            @RequestBody @Valid AnnouncementRequest request,
             Authentication authentication) {
 
         Long merchantId = (Long) authentication.getPrincipal();
@@ -66,7 +67,7 @@ public class AnnouncementController {
     @PutMapping("/update/{id}")
     public ResponseEntity<Announcement> update(
             @PathVariable Long id,
-            @RequestBody AnnouncementRequest request,
+            @RequestBody @Valid AnnouncementRequest request,
             Authentication authentication) {
 
         Long userId = (Long) authentication.getPrincipal();
@@ -85,5 +86,11 @@ public class AnnouncementController {
 
         announcementService.deleteAnnouncement(id, userId, authentication);
         return ResponseEntity.ok("Annonce supprimée avec succès.");
+    }
+
+    @PostMapping("/{id}/decrease-stock")
+    public ResponseEntity<Void> decreaseStock(@PathVariable Long id, @RequestParam Integer quantity) {
+        announcementService.decreaseStock(id, quantity);
+        return ResponseEntity.ok().build();
     }
 }

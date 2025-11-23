@@ -18,18 +18,32 @@ public class Announcement {
     private Long id;
 
     @Column(nullable = false)
-    private Long merchantId; // ID du propriétaire, lié au JWT
+    private Long merchantId;
 
     private String title;
     private String description;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private AnnouncementType announcementType;
 
     @Enumerated(EnumType.STRING)
-    private ModerationStatus moderationStatus = ModerationStatus.PENDING_REVIEW;
+    private ModerationStatus moderationStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FoodCategory category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Unit unit;
 
 
+    @Column(nullable = false)
+    private Double stock;
+
+
+    @Column(nullable = false)
     private Double price;
 
     private String imageUrl1;

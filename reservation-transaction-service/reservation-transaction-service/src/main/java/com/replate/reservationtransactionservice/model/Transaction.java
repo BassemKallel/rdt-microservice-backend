@@ -31,9 +31,11 @@ public class Transaction {
     private Float quantiteTransmise;
 
     @Column(nullable = false)
+    @Builder.Default
     private LocalDateTime transactionDate = LocalDateTime.now();
 
     @Enumerated(EnumType.STRING)
+    @Builder.Default
     private TransactionStatus status = TransactionStatus.PENDING_CONFIRMATION;
 
     @Enumerated(EnumType.STRING)

@@ -72,4 +72,16 @@ public class StripePaymentService {
             throw new PaymentFailedException("Erreur lors de l'initialisation Stripe : " + e.getMessage());
         }
     }
+
+    public String getClientSecret(String paymentIntentId) {
+        if (paymentIntentId == null) return null;
+        try {
+            PaymentIntent intent = PaymentIntent.retrieve(paymentIntentId);
+            return intent.getClientSecret();
+        } catch (StripeException e) {
+            // Log l'erreur mais ne pas bloquer le flux
+            System.err.println("Erreur récupération Stripe: " + e.getMessage());
+            return null;
+        }
+    }
 }

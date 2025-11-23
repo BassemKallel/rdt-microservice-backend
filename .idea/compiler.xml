@@ -8,6 +8,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
+        <module name="offer-management-service" />
         <module name="eureka-server" />
         <module name="file-service" />
         <module name="reservation-transaction-service" />
@@ -21,7 +22,6 @@
         </processorPath>
         <module name="user-management-service" />
         <module name="reporting-safety-service" />
-        <module name="offer-management-service" />
       </profile>
     </annotationProcessing>
   </component>

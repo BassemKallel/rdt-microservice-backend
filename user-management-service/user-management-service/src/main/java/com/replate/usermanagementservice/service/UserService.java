@@ -115,7 +115,8 @@ public class UserService {
     }
 
     public List<User> getAllUsers(){
-        return userRepository.findAll();
+        List<UserRole> rolesToValidate = List.of(UserRole.MERCHANT, UserRole.ASSOCIATION,UserRole.INDIVIDUAL);
+        return userRepository.findAllByRoleIn(rolesToValidate);
     }
 
 

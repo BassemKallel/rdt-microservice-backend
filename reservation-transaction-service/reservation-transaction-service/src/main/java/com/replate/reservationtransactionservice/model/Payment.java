@@ -33,5 +33,6 @@ public class Payment {
     private String providerPaymentId; // external gateway ID (Stripe, etc.)
 
     @Column(name = "created_at", nullable = false)
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }
