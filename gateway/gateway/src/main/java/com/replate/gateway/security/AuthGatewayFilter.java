@@ -32,6 +32,7 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
             "/api/v1/offers/search",
             "/api/v1/offers/public",
             "/api/v1/files/upload",
+            "/api/v1/offers/browse",
             "/actuator/health"
     );
 

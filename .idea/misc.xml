@@ -19,6 +19,7 @@
         <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/reservation-transaction-service/reservation-transaction-service/pom.xml" />
         <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/user-management-service/user-management-service/pom.xml" />
         <option value="$PROJECT_DIR$/gateway/gateway/pom.xml" />
+        <option value="$PROJECT_DIR$/favourite-service/favourite-service/pom.xml" />
       </list>
     </option>
   </component>

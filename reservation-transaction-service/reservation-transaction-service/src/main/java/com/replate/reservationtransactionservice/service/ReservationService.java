@@ -30,7 +30,7 @@ public class ReservationService {
     // --- 1. CRÉATION ---
     @Transactional
     public ReservationResponse createReservation(ReservationRequest request) {
-        // Récupération de l'annonce
+        // Récupération de l'annonce via OMS
         AnnouncementResponse announcement = announcementClient.getAnnouncementById(request.getAnnonceId());
 
         if (announcement == null) {
@@ -53,88 +53,68 @@ public class ReservationService {
 
         transactionRepository.save(transaction);
 
-        return ReservationResponse.builder()
-                .transactionId(transaction.getTransactionId())
-                .status(transaction.getStatus())
-                .active(true)
-                .price(request.getAmount())
-                .availableQuantity(request.getQuantiteTransmise())
-                .message("Réservation créée avec succès")
-                .build();
+        return mapToResponse(transaction);
     }
 
-    // --- 2. CONFIRMATION (MISE À JOUR AVEC STOCK) ---
+    // --- 2. CONFIRMATION (Marchand) ---
     @Transactional
     public ReservationResponse confirmReservation(ConfirmReservationRequest request) {
 
         Transaction transaction = transactionRepository.findById(request.getTransactionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction non trouvée"));
 
-        // Vérification que c'est bien le marchand qui confirme
+        // Vérification : Seul le marchand peut confirmer
         if (request.getMerchantId() != null && !request.getMerchantId().equals(transaction.getMerchantId())) {
             throw new UnauthorizedActionException("Vous n'êtes pas autorisé à confirmer cette transaction.");
         }
 
+        // Vérification statut
+        if (transaction.getStatus() == TransactionStatus.CONFIRMED) {
+            return mapToResponse(transaction);
+        }
+
         // 🟢 DÉCRÉMENTATION DU STOCK (Appel Synchrone OMS)
         try {
-            // On cast en Integer car le stock est un int, mais la quantité transaction est Float
             Integer qtyToDecrease = Math.round(transaction.getQuantiteTransmise());
             announcementClient.decreaseStock(transaction.getAnnonceId(), qtyToDecrease);
         } catch (Exception e) {
-            // On capture l'erreur (400 Bad Request de l'OMS si stock insuffisant)
             throw new BusinessException("Impossible de confirmer : Stock insuffisant ou erreur service offre.");
         }
 
         String clientSecret = null;
         String message = "Réservation confirmée";
 
-        // LOGIQUE VENTE : On déclenche le paiement Stripe
+        // LOGIQUE VENTE : Paiement Stripe
         if (transaction.getOfferType() == OfferType.SALE) {
-
-            // Si déjà confirmé, on ne fait rien
-            if (transaction.getStatus() == TransactionStatus.CONFIRMED) {
-                return ReservationResponse.builder()
-                        .transactionId(transaction.getTransactionId())
-                        .status(transaction.getStatus())
-                        .message("Déjà confirmée")
-                        .build();
-            }
-
-            // 1. Récupérer le prix unitaire de l'annonce pour calculer le total
+            // Récupération du prix unitaire frais
             AnnouncementResponse announcement = announcementClient.getAnnouncementById(transaction.getAnnonceId());
             if (announcement == null) {
-                throw new ResourceNotFoundException("Impossible de récupérer l'annonce pour le calcul du prix.");
+                throw new ResourceNotFoundException("Annonce introuvable.");
             }
 
-            // Calcul du prix total (Prix * Quantité)
             Float totalAmount = (float) (announcement.getPrice() * transaction.getQuantiteTransmise());
 
-            // 2. Appeler Stripe pour créer l'intention (PaymentIntent)
+            // Création PaymentIntent
             PaymentIntent intent = stripePaymentService.createPaymentIntent(transaction, totalAmount);
-
-            // 3. Récupérer le secret pour le frontend
             clientSecret = intent.getClientSecret();
             message = "Paiement requis. Utilisez le clientSecret pour finaliser.";
 
-            // On laisse le statut en PENDING_CONFIRMATION en attendant le Webhook
+            // Le statut reste PENDING_CONFIRMATION jusqu'au Webhook Stripe
 
         } else {
-            // LOGIQUE DONATION : Confirmation immédiate
+            // LOGIQUE DONATION : Validation immédiate
             transaction.setStatus(TransactionStatus.CONFIRMED);
             transactionRepository.save(transaction);
         }
 
-        return ReservationResponse.builder()
-                .transactionId(transaction.getTransactionId())
-                .status(transaction.getStatus())
-                .active(true)
-                .availableQuantity(transaction.getQuantiteTransmise())
-                .message(message)
-                .paymentClientSecret(clientSecret)
-                .build();
+        // On construit la réponse manuellement ici pour inclure le clientSecret fraîchement généré
+        ReservationResponse response = mapToResponse(transaction);
+        response.setMessage(message);
+        response.setPaymentClientSecret(clientSecret);
+        return response;
     }
 
-    // --- 3. REJET ---
+    // --- 3. REJET (Marchand) ---
     @Transactional
     public ReservationResponse rejectReservation(ConfirmReservationRequest request) {
         Transaction transaction = transactionRepository.findById(request.getTransactionId())
@@ -144,107 +124,71 @@ public class ReservationService {
             throw new UnauthorizedActionException("Vous n'êtes pas autorisé à rejeter cette transaction.");
         }
 
-        if (transaction.getStatus() == TransactionStatus.CONFIRMED ||
-                transaction.getStatus() == TransactionStatus.CANCELLED) {
-            throw new BusinessException("Cette réservation est déjà traitée et ne peut être rejetée.");
+        if (transaction.getStatus() != TransactionStatus.PENDING_CONFIRMATION) {
+            throw new BusinessException("Cette réservation ne peut plus être rejetée.");
         }
 
         transaction.setStatus(TransactionStatus.CANCELLED);
         transactionRepository.save(transaction);
 
-        return ReservationResponse.builder()
-                .transactionId(transaction.getTransactionId())
-                .status(transaction.getStatus())
-                .active(false)
-                .availableQuantity(transaction.getQuantiteTransmise())
-                .message("Réservation rejetée avec succès")
-                .build();
+        return mapToResponse(transaction);
     }
 
+    // --- 4. DÉTAIL (Polling Client) ---
     @Transactional(readOnly = true)
     public ReservationResponse getReservationById(Long id) {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction non trouvée"));
-
-        String clientSecret = null;
-        String message = "En attente";
-
-        // Si une vente est confirmée mais pas encore payée, on récupère le secret
-        if (transaction.getOfferType() == OfferType.SALE
-                && transaction.getPayment() != null
-                && transaction.getPayment().getStatus() == PaymentStatus.PENDING) {
-
-            // On appelle Stripe pour récupérer le secret à jour
-            clientSecret = stripePaymentService.getClientSecret(transaction.getPayment().getProviderPaymentId());
-            message = "Paiement requis";
-        } else if (transaction.getStatus() == TransactionStatus.CONFIRMED) {
-            message = "Réservation validée et payée";
-        }
-
-        // Calcul du prix (si vente)
-        // Attention: Pour être précis, il faudrait stocker le prix figé dans la transaction.
-        // Ici on fait une estimation simple ou on met 0.
-        Float price = 0.0f;
-        if(transaction.getPayment() != null) {
-            price = transaction.getPayment().getAmount();
-        }
-
-        return ReservationResponse.builder()
-                .transactionId(transaction.getTransactionId())
-                .status(transaction.getStatus())
-                .active(transaction.getStatus() != TransactionStatus.CANCELLED)
-                .availableQuantity(transaction.getQuantiteTransmise())
-                .price(price)
-                .message(message)
-                .paymentClientSecret(clientSecret) // C'est ce que le Client attend !
-                .build();
+        return mapToResponse(transaction);
     }
+
+    // --- 5. HISTORIQUE UTILISATEUR (Client ou Marchand) ---
     @Transactional(readOnly = true)
     public List<ReservationResponse> getReservationsByUser(Long userId, String userRole) {
         List<Transaction> transactions;
+        String role = userRole.replace("ROLE_", "").trim().toUpperCase();
 
-        // Nettoyage du rôle (au cas où il arrive sous la forme "ROLE_MERCHANT")
-        String role = userRole.startsWith("ROLE_") ? userRole.substring(5) : userRole;
-
-        if ("MERCHANT".equalsIgnoreCase(role)) {
-            // Cas MARCHAND : Il voit toutes les ventes de SES produits
+        if ("MERCHANT".equals(role)) {
+            // Le Marchand voit ses VENTES
             transactions = transactionRepository.findByMerchantId(userId);
         } else {
-            // Cas CLIENT (Individual/Association) : Il voit SES achats
+            // Le Client voit ses ACHATS
             transactions = transactionRepository.findByUserId(userId);
         }
+        return transactions.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
 
-        // On transforme chaque Transaction en ReservationResponse
-        return transactions.stream()
+    // --- 6. HISTORIQUE GLOBAL (Admin) ---
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> getAllReservations() {
+        return transactionRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    // --- 2. MÉTHODE UTILITAIRE : MAPPING ---
+    // --- UTILITAIRE DE MAPPING (Centralisé) ---
     private ReservationResponse mapToResponse(Transaction transaction) {
         String clientSecret = null;
         String message = "Statut: " + transaction.getStatus();
 
-        // Logique pour récupérer le secret Stripe (seulement si c'est une vente non payée)
+        // Récupérer le secret Stripe existant si c'est une vente en attente de paiement
         if (transaction.getOfferType() == OfferType.SALE
                 && transaction.getPayment() != null
                 && transaction.getPayment().getStatus() == PaymentStatus.PENDING) {
-            // Optionnel : Pour une liste, on peut éviter cet appel pour la performance,
-            // mais c'est utile si le client clique sur "Payer" depuis l'historique.
             clientSecret = stripePaymentService.getClientSecret(transaction.getPayment().getProviderPaymentId());
+            message = "Paiement requis";
         }
 
-        // Calcul du prix à afficher
+        // Calcul du prix
         Float price = 0.0f;
         if (transaction.getPayment() != null) {
             price = transaction.getPayment().getAmount();
         } else if (transaction.getOfferType() == OfferType.SALE) {
-            // Si pas encore de paiement (ex: PENDING_CONFIRMATION), on estime le prix
-            // Note: Idéalement, stockez le prix unitaire dans Transaction pour figer le prix
+            // Prix estimé (si pas encore de paiement)
             price = 0.0f;
         }
 
-        // Récupération du Titre de l'annonce via Feign (Appel à OMS)
+        // Récupérer le titre de l'annonce
         String title = "Annonce #" + transaction.getAnnonceId();
         try {
             AnnouncementResponse ann = announcementClient.getAnnouncementById(transaction.getAnnonceId());
@@ -252,8 +196,7 @@ public class ReservationService {
                 title = ann.getTitle();
             }
         } catch (Exception e) {
-            // Si l'annonce a été supprimée ou le service injoignable, on garde l'ID par défaut
-            System.err.println("Impossible de récupérer le titre pour l'annonce " + transaction.getAnnonceId());
+            // Ignorer les erreurs Feign pour ne pas bloquer l'affichage de la liste
         }
 
         return ReservationResponse.builder()
@@ -264,9 +207,9 @@ public class ReservationService {
                 .price(price)
                 .message(message)
                 .paymentClientSecret(clientSecret)
-                // Nouveaux champs
                 .transactionDate(transaction.getTransactionDate())
                 .userId(transaction.getUserId())
+                .userId(transaction.getMerchantId())
                 .announcementId(transaction.getAnnonceId())
                 .announcementTitle(title)
                 .build();

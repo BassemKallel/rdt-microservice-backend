@@ -20,7 +20,6 @@ public class ReservationResponse {
     private String message;
     private String paymentClientSecret;
 
-    // --- NOUVEAUX CHAMPS POUR L'HISTORIQUE ---
     private LocalDateTime transactionDate; // Date de la commande
     private Long userId;                   // ID de l'acheteur
     private Long announcementId;           // ID de l'annonce
