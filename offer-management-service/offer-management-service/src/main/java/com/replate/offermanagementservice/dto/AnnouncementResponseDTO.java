@@ -1,9 +1,6 @@
 package com.replate.offermanagementservice.dto;
 
-import com.replate.offermanagementservice.model.Announcement;
-import com.replate.offermanagementservice.model.AnnouncementType;
-import com.replate.offermanagementservice.model.FoodCategory;
-import com.replate.offermanagementservice.model.Unit;
+import com.replate.offermanagementservice.model.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -16,6 +13,7 @@ public class AnnouncementResponseDTO {
     private Double stock;
     private String imageUrl1;
     private AnnouncementType announcementType;
+    private ModerationStatus moderationStatus;
     private FoodCategory category;
     private Unit unit;
     private LocalDateTime expiryDate;
@@ -34,6 +32,7 @@ public class AnnouncementResponseDTO {
         dto.setStock(a.getStock());
         dto.setImageUrl1(a.getImageUrl1());
         dto.setAnnouncementType(a.getAnnouncementType());
+        dto.setModerationStatus(a.getModerationStatus());
         dto.setCategory(a.getCategory());
         dto.setUnit(a.getUnit());
         dto.setExpiryDate(a.getExpiryDate());

@@ -15,4 +15,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long>{
 
     // Find payment by provider gateway ID
     Optional<Payment> findByProviderPaymentId(String providerPaymentId);
+
+    List<Payment> findByTransaction_UserId(Long userId);
+
+    // Trouver les paiements reçus par un marchand (via Transaction.merchantId)
+    List<Payment> findByTransaction_MerchantId(Long merchantId);
 }

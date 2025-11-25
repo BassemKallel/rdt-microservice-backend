@@ -55,6 +55,7 @@ public class UserService {
                 break;
             case INDIVIDUAL:
                 newUser = new IndividualBeneficiary();
+                newUser.setStatus(AccountStatus.ACTIVE);
                 break;
             case ADMIN:
                 newUser = new User();

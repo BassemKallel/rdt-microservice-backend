@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime; // Import
 
 @Data
 @NoArgsConstructor
@@ -12,9 +13,11 @@ import lombok.NoArgsConstructor;
 @Builder
 public class PaymentResponse {
 
-    private Long paymentId;           // Payment record ID
-    private PaymentStatus status;     // PENDING, COMPLETED, REFUNDED
-    private String providerPaymentId; // External gateway reference
-    private String message;           // Info message for client or microservices
-
+    private Long paymentId;
+    private Long transactionId;       // Utile pour faire le lien
+    private PaymentStatus status;
+    private Float amount;             // Indispensable pour une facture
+    private String providerPaymentId;
+    private LocalDateTime createdAt;  // Date du paiement
+    private String message;
 }
