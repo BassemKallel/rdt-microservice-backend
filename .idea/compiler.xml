@@ -13,7 +13,7 @@
         <module name="file-service" />
         <module name="reservation-transaction-service" />
       </profile>
-      <profile name="Annotation profile for favorite-service" enabled="true">
+      <profile name="Annotation profile for user-management-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />

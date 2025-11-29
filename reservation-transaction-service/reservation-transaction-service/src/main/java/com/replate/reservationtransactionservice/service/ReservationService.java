@@ -63,12 +63,10 @@ public class ReservationService {
         Transaction transaction = transactionRepository.findById(request.getTransactionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction non trouvée"));
 
-        // Vérification : Seul le marchand peut confirmer
         if (request.getMerchantId() != null && !request.getMerchantId().equals(transaction.getMerchantId())) {
             throw new UnauthorizedActionException("Vous n'êtes pas autorisé à confirmer cette transaction.");
         }
 
-        // Vérification statut
         if (transaction.getStatus() == TransactionStatus.CONFIRMED) {
             return mapToResponse(transaction);
         }
@@ -84,17 +82,14 @@ public class ReservationService {
         String clientSecret = null;
         String message = "Réservation confirmée";
 
-        // LOGIQUE VENTE : Paiement Stripe
         if (transaction.getOfferType() == OfferType.SALE) {
-            // Récupération du prix unitaire frais
             AnnouncementResponse announcement = announcementClient.getAnnouncementById(transaction.getAnnonceId());
             if (announcement == null) {
                 throw new ResourceNotFoundException("Annonce introuvable.");
             }
-
+            transaction.setStatus(TransactionStatus.PENDING_PAYMENT);
             Float totalAmount = (float) (announcement.getPrice() * transaction.getQuantiteTransmise());
 
-            // Création PaymentIntent
             PaymentIntent intent = stripePaymentService.createPaymentIntent(transaction, totalAmount);
             clientSecret = intent.getClientSecret();
             message = "Paiement requis. Utilisez le clientSecret pour finaliser.";
@@ -102,7 +97,6 @@ public class ReservationService {
             // Le statut reste PENDING_CONFIRMATION jusqu'au Webhook Stripe
 
         } else {
-            // LOGIQUE DONATION : Validation immédiate
             transaction.setStatus(TransactionStatus.CONFIRMED);
             transactionRepository.save(transaction);
         }
@@ -149,16 +143,13 @@ public class ReservationService {
         String role = userRole.replace("ROLE_", "").trim().toUpperCase();
 
         if ("MERCHANT".equals(role)) {
-            // Le Marchand voit ses VENTES
             transactions = transactionRepository.findByMerchantId(userId);
         } else {
-            // Le Client voit ses ACHATS
             transactions = transactionRepository.findByUserId(userId);
         }
         return transactions.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    // --- 6. HISTORIQUE GLOBAL (Admin) ---
     @Transactional(readOnly = true)
     public List<ReservationResponse> getAllReservations() {
         return transactionRepository.findAll().stream()
@@ -166,12 +157,10 @@ public class ReservationService {
                 .collect(Collectors.toList());
     }
 
-    // --- UTILITAIRE DE MAPPING (Centralisé) ---
     private ReservationResponse mapToResponse(Transaction transaction) {
         String clientSecret = null;
         String message = "Statut: " + transaction.getStatus();
 
-        // Récupérer le secret Stripe existant si c'est une vente en attente de paiement
         if (transaction.getOfferType() == OfferType.SALE
                 && transaction.getPayment() != null
                 && transaction.getPayment().getStatus() == PaymentStatus.PENDING) {
@@ -179,7 +168,6 @@ public class ReservationService {
             message = "Paiement requis";
         }
 
-        // Calcul du prix
         Float price = 0.0f;
         if (transaction.getPayment() != null) {
             price = transaction.getPayment().getAmount();
@@ -188,7 +176,6 @@ public class ReservationService {
             price = 0.0f;
         }
 
-        // Récupérer le titre de l'annonce
         String title = "Annonce #" + transaction.getAnnonceId();
         try {
             AnnouncementResponse ann = announcementClient.getAnnouncementById(transaction.getAnnonceId());
@@ -209,9 +196,23 @@ public class ReservationService {
                 .paymentClientSecret(clientSecret)
                 .transactionDate(transaction.getTransactionDate())
                 .userId(transaction.getUserId())
-                .userId(transaction.getMerchantId())
                 .announcementId(transaction.getAnnonceId())
                 .announcementTitle(title)
                 .build();
+    }
+
+    @Transactional
+    public ReservationResponse markAsDelivered(Long transactionId, Long userId ) {
+        Transaction transaction = transactionRepository.findById(transactionId).
+                orElseThrow(()->new ResourceNotFoundException("Transaction not found"));
+        if (!transaction.getUserId().equals(userId)) {
+            throw new UnauthorizedActionException("Seul le marchand peut marquer la commande comme livrée.");
+        }
+        if(transaction.getStatus() != TransactionStatus.CONFIRMED){
+            throw new UnauthorizedActionException("Impossible de livrer : La réservation n'est pas encore confirmée ou est déjà terminée.");
+        }
+        transaction.setStatus(TransactionStatus.DELIVERED);
+        transactionRepository.save(transaction);
+        return mapToResponse(transaction);
     }
 }

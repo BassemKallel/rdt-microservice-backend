@@ -46,23 +46,29 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
         String path = request.getURI().getPath();
         String method = request.getMethod().name();
 
-        // --- CORRECTION ICI ---
-        // 1. Vérification spécifique pour laisser passer GET /offers/{id} (où id est un nombre)
-        // Cela empêche de laisser passer /offers/create par erreur
-        boolean isPublicOfferDetail = method.equals("GET") && path.matches("^/api/v1/offers/\\d+$");
+        // Récupération du header Authorization s'il existe
+        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
-        // 2. Si c'est dans la liste blanche OU si c'est un détail d'offre public
-        if (isPublicOfferDetail || OPEN_ENDPOINTS.stream().anyMatch(path::startsWith)) {
+        // 1. Identifier si l'endpoint est public
+        // On combine votre liste blanche et la regex pour les détails d'offre
+        boolean isPublicOfferDetail = method.equals("GET") && path.matches("^/api/v1/offers/\\d+$");
+        boolean isPublicEndpoint = isPublicOfferDetail || OPEN_ENDPOINTS.stream().anyMatch(path::startsWith);
+
+        // 2. CAS 1 : Accès Anonyme Autorisé
+        // L'endpoint est public ET l'utilisateur n'a pas envoyé de token
+        if (isPublicEndpoint && (authHeader == null || !authHeader.startsWith("Bearer "))) {
             return chain.filter(exchange);
         }
 
-        // 3. Sinon, on procède à l'authentification standard
-        String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // 3. CAS 2 : Accès Interdit
+        // L'endpoint est protégé ET l'utilisateur n'a pas de token valide
+        if (!isPublicEndpoint && (authHeader == null || !authHeader.startsWith("Bearer "))) {
             return onError(exchange, "Authorization header missing or invalid", HttpStatus.UNAUTHORIZED);
         }
 
-        String token = authHeader.substring(7);
+        // 4. CAS 3 : Traitement du Token (Authentification)
+        // Ici, on a un token (que l'endpoint soit public ou privé). On l'analyse pour injecter le contexte.
+        String token = authHeader.substring(7); // On retire "Bearer "
 
         try {
             Claims claims = jwtUtil.validateAndExtractClaims(token);
@@ -70,7 +76,7 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
             String userId = String.valueOf(claims.get("userId"));
             String role = String.valueOf(claims.get("role"));
 
-            // Gestion robuste du status
+            // Gestion robuste du statut (rétro-compatibilité avec 'validated' ou 'status')
             Object statusObj = claims.get("status");
             String status;
             if (statusObj != null) {
@@ -80,12 +86,14 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
                 status = (validatedObj != null && Boolean.parseBoolean(String.valueOf(validatedObj))) ? "ACTIVE" : "PENDING";
             }
 
+            // Création de la requête mutée avec les headers internes
             ServerHttpRequest mutatedRequest = request.mutate()
                     .header("X-User-Id", userId)
                     .header("X-User-Role", role)
                     .header("X-User-Status", status)
                     .build();
 
+            // On passe la main à la suite de la chaîne avec les nouvelles infos
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
 
         } catch (JwtException e) {

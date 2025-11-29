@@ -73,4 +73,14 @@ public class ReservationController {
 
         return ResponseEntity.ok(reservationService.getAllReservations());
     }
+
+    @PostMapping("/{id}/deliver")
+    public ResponseEntity<ReservationResponse> markAsDelivered(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        Long userId = (Long) authentication.getPrincipal(); // ID du marchand connecté
+
+        return ResponseEntity.ok(reservationService.markAsDelivered(id, userId));
+    }
 }

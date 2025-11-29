@@ -1,7 +1,9 @@
 package com.replate.reservationtransactionservice.model;
 
 public enum TransactionStatus {
-    PENDING_CONFIRMATION, // Default
+    PENDING_CONFIRMATION,
+    PENDING_PAYMENT,
     CONFIRMED,
-    CANCELLED
+    CANCELLED,
+    DELIVERED
 }

@@ -51,7 +51,6 @@ public class AnnouncementService {
 
         // 1. Logique de Filtrage
         if (userRole == null) {
-            // Anonyme : On affiche tout
             announcements = announcementRepository.findAll();
         } else {
             String normalizedRole = userRole.replace("ROLE_", "").trim().toUpperCase();
@@ -62,13 +61,12 @@ public class AnnouncementService {
                 case "ASSOCIATION":
                     announcements = announcementRepository.findByAnnouncementType(AnnouncementType.DONATION);
                     break;
-                default: // MERCHANT, ADMIN
+                default:
                     announcements = announcementRepository.findAll();
                     break;
             }
         }
 
-        // 2. Enrichissement (Mapping vers DTO + Appel UMS)
         return announcements.stream()
                 .map(this::enrichWithMerchantName)
                 .collect(Collectors.toList());

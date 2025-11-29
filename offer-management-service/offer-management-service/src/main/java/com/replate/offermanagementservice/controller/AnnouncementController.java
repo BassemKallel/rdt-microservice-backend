@@ -43,7 +43,6 @@ public class AnnouncementController {
 
     @GetMapping("/{id}")
     public ResponseEntity<AnnouncementResponseDTO> getById(@PathVariable Long id) {
-        // Retourne le DTO enrichi avec le nom du marchand
         return ResponseEntity.ok(announcementService.getByIdWithMerchant(id));
     }
 
