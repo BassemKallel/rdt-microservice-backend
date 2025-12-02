@@ -15,4 +15,7 @@ public interface AnnouncementClient {
 
     @PostMapping("/offers/{id}/decrease-stock")
     void decreaseStock(@PathVariable("id") Long id, @RequestParam("quantity") Integer quantity);
+
+    @PostMapping("/offers/{id}/increase-stock")
+    void increaseStock(@PathVariable("id") Long id, @RequestParam("quantity") Integer quantity);
 }

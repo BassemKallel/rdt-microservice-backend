@@ -205,7 +205,7 @@ public class ReservationService {
     public ReservationResponse markAsDelivered(Long transactionId, Long userId ) {
         Transaction transaction = transactionRepository.findById(transactionId).
                 orElseThrow(()->new ResourceNotFoundException("Transaction not found"));
-        if (!transaction.getUserId().equals(userId)) {
+        if (!transaction.getMerchantId().equals(userId)) {
             throw new UnauthorizedActionException("Seul le marchand peut marquer la commande comme livrée.");
         }
         if(transaction.getStatus() != TransactionStatus.CONFIRMED){

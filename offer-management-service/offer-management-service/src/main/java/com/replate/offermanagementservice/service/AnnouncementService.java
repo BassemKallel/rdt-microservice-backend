@@ -203,4 +203,12 @@ public class AnnouncementService {
         }
         return AnnouncementResponseDTO.fromEntity(announcement, merchantName);
     }
+
+    @Transactional
+    public void increaseStock(Long announcementId, Integer quantity) {
+        Announcement announcement = getById(announcementId);
+        announcement.setStock(announcement.getStock() + quantity);
+        announcementRepository.save(announcement);
+        log.info("Stock ré-incrémenté (Compensation) pour annonce {}. Nouveau stock: {}", announcementId, announcement.getStock());
+    }
 }

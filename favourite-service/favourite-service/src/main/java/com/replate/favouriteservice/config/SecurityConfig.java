@@ -28,6 +28,8 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // Seuls les rôles INDIVIDUAL et ASSOCIATION peuvent gérer les favoris
+
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/favorites/**").hasAnyRole("INDIVIDUAL", "ASSOCIATION")
                         .anyRequest().authenticated()
                 )

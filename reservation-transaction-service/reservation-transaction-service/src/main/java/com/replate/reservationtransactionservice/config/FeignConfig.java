@@ -17,29 +17,25 @@ public class FeignConfig {
     @Bean
     public RequestInterceptor requestInterceptor() {
         return template -> {
-            // Récupérer la requête HTTP entrante (celle venant de la Gateway)
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
 
             if (attributes != null) {
                 HttpServletRequest request = attributes.getRequest();
 
-                // Liste des headers à propager
                 String userId = request.getHeader("X-User-Id");
                 String userRole = request.getHeader("X-User-Role");
                 String userStatus = request.getHeader("X-User-Status");
-                String authHeader = request.getHeader("Authorization");
 
-                // Injection dans la requête sortante (vers OMS)
-                if (userId != null) {
-                    template.header("X-User-Id", userId);
-                    log.debug("Propagation Header X-User-Id: {}", userId);
-                }
+                // 🟢 MODIFICATION : Récupérer le secret entrant
+                String internalSecret = request.getHeader("X-Internal-Secret");
+
+                if (userId != null) template.header("X-User-Id", userId);
                 if (userRole != null) template.header("X-User-Role", userRole);
                 if (userStatus != null) template.header("X-User-Status", userStatus);
 
-                // On propage aussi le Bearer token original par sécurité
-                if (authHeader != null) {
-                    template.header("Authorization", authHeader);
+                // 🟢 MODIFICATION : Le propager vers le service suivant (OMS)
+                if (internalSecret != null) {
+                    template.header("X-Internal-Secret", internalSecret);
                 }
             }
         };

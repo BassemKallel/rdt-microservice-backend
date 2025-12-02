@@ -1,5 +1,6 @@
 package com.replate.offermanagementservice.security;
 
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,19 +25,31 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(HeadersAuthFilter.class);
 
+    // 🔒 DOIT ÊTRE LE MÊME QUE DANS LA GATEWAY
+    private static final String EXPECTED_SECRET = "Replate_Super_Secret_Key_2025";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
+        // --- 🟢 DÉBUT DE LA VÉRIFICATION DU SECRET ---
+        String receivedSecret = request.getHeader("X-Internal-Secret");
+
+        // On ignore la vérification pour les endpoints techniques comme Actuator si nécessaire
+        if (!request.getRequestURI().startsWith("/actuator")) {
+            if (receivedSecret == null || !receivedSecret.equals(EXPECTED_SECRET)) {
+                log.warn("⛔ Accès rejeté : Secret invalide ou manquant pour {}", request.getRequestURI());
+                // On renvoie directement une erreur 403 Forbidden et on coupe la chaîne
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: Internal Secret Missing");
+                return;
+            }
+        }
+        // --- 🟢 FIN DE LA VÉRIFICATION ---
+
+        // Le reste de la logique existante continue ici...
         final String userId = request.getHeader("X-User-Id");
         final String userRole = request.getHeader("X-User-Role");
         String userStatus = request.getHeader("X-User-Status");
-
-
-        log.debug("--- [OMS HeadersAuthFilter] Headers Reçus ---");
-        log.debug("X-User-Id: {}", userId);
-        log.debug("X-User-Status: {}", userStatus);
-        log.debug("X-User-Role: {}", userRole);
 
         if (userId != null && userRole != null) {
             String cleanedUserRole = userRole.trim();
@@ -54,12 +67,15 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
                     authorities
             );
 
+            // Note: Adaptez cette partie "details" selon ce qui existait déjà dans le service spécifique
+            // (ex: RTS n'avait pas "status" dans details, mais OMS si).
             Map<String, String> details = new HashMap<>();
             details.put("status", userStatus != null ? userStatus : "PENDING");
             authToken.setDetails(details);
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }
+
         filterChain.doFilter(request, response);
     }
 }

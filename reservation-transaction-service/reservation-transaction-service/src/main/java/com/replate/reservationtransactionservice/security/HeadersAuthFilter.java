@@ -23,17 +23,35 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(HeadersAuthFilter.class);
 
+    // 🔒 DOIT ÊTRE LE MÊME QUE DANS LA GATEWAY
+    private static final String EXPECTED_SECRET = "Replate_Super_Secret_Key_2025";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Récupération des headers injectés par la Gateway
+        // --- 🟢 DÉBUT DE LA VÉRIFICATION DU SECRET ---
+        String receivedSecret = request.getHeader("X-Internal-Secret");
+        String uri = request.getRequestURI();
+
+        // On autorise explicitement /webhook (Stripe) et /actuator (Monitoring) sans secret
+        boolean isPublicEndpoint = uri.startsWith("/actuator") || uri.startsWith("/webhook");
+
+        if (!isPublicEndpoint) {
+            // Pour tout le reste (ex: /reservations), le secret est OBLIGATOIRE
+            if (receivedSecret == null || !receivedSecret.equals(EXPECTED_SECRET)) {
+                log.warn("⛔ Accès rejeté : Secret invalide ou manquant pour {}", uri);
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: Internal Secret Missing");
+                return; // On arrête la requête ici
+            }
+        }
+        // --- 🟢 FIN DE LA VÉRIFICATION ---
+
+        // Le reste de la logique d'authentification utilisateur continue ici...
         final String userId = request.getHeader("X-User-Id");
         final String userRole = request.getHeader("X-User-Role");
 
         if (userId != null && userRole != null) {
-            log.debug("Authentification via Headers - UserID: {}, Role: {}", userId, userRole);
-
             String role = userRole.trim();
             if (!role.startsWith("ROLE_")) {
                 role = "ROLE_" + role;
@@ -43,20 +61,14 @@ public class HeadersAuthFilter extends OncePerRequestFilter {
                     new SimpleGrantedAuthority(role)
             );
 
-            // Création de l'objet d'authentification
-            // Principal = userId (Long) pour faciliter l'utilisation dans les contrôleurs
             UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    Long.valueOf(userId.trim()), // Principal
-                    null,                        // Credentials (null car pré-authentifié)
-                    authorities                  // Autorités
+                    Long.valueOf(userId.trim()),
+                    null,
+                    authorities
             );
 
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-            // Injection dans le contexte de sécurité
             SecurityContextHolder.getContext().setAuthentication(authToken);
-        } else {
-            log.debug("Headers d'authentification manquants (X-User-Id ou X-User-Role).");
         }
 
         filterChain.doFilter(request, response);

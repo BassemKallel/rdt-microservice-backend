@@ -98,4 +98,13 @@ public class AnnouncementController {
         announcementService.decreaseStock(id, quantity);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/{id}/increase-stock")
+    public ResponseEntity<Void> increaseStock(
+            @PathVariable Long id,
+            @RequestParam Integer quantity) {
+
+        announcementService.increaseStock(id, quantity);
+        return ResponseEntity.ok().build();
+    }
 }

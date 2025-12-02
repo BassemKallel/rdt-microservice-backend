@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class FavoriteService {
@@ -22,17 +23,14 @@ public class FavoriteService {
 
     public Favorite addFavorite(Long userId, Long targetId, String targetTypeStr) {
         TargetType targetType = TargetType.valueOf(targetTypeStr.toUpperCase());
-
-        if (favoriteRepository.existsByUserIdAndTargetIdAndTargetType(userId, targetId, targetType)) {
-            // Lève une exception HTTP 409 (Conflict)
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cet élément est déjà dans vos favoris.");
+        Optional<Favorite> existingFavorite = favoriteRepository.findByUserIdAndTargetIdAndTargetType(userId, targetId, targetType);
+        if (existingFavorite.isPresent()) {
+            return existingFavorite.get();
         }
-
         Favorite favorite = new Favorite();
         favorite.setUserId(userId);
         favorite.setTargetId(targetId);
         favorite.setTargetType(targetType);
-
         return favoriteRepository.save(favorite);
     }
 

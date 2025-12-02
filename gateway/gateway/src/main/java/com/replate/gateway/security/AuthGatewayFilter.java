@@ -22,9 +22,11 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(AuthGatewayFilter.class);
 
+    // 🔒 LE SECRET PARTAGÉ (Idéalement à mettre dans application.properties)
+    private static final String INTERNAL_SECRET = "Replate_Super_Secret_Key_2025";
+
     private final GatewayJwtUtil jwtUtil;
 
-    // RETIREZ "/api/v1/offers/" de cette liste si vous l'avez ajouté
     private static final List<String> OPEN_ENDPOINTS = List.of(
             "/api/v1/users/register",
             "/api/v1/users/login",
@@ -32,7 +34,6 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
             "/api/v1/offers/search",
             "/api/v1/offers/public",
             "/api/v1/files/upload",
-            "/api/v1/offers/browse",
             "/actuator/health"
     );
 
@@ -45,55 +46,44 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
         String method = request.getMethod().name();
-
-        // Récupération du header Authorization s'il existe
         String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
-        // 1. Identifier si l'endpoint est public
-        // On combine votre liste blanche et la regex pour les détails d'offre
         boolean isPublicOfferDetail = method.equals("GET") && path.matches("^/api/v1/offers/\\d+$");
         boolean isPublicEndpoint = isPublicOfferDetail || OPEN_ENDPOINTS.stream().anyMatch(path::startsWith);
 
-        // 2. CAS 1 : Accès Anonyme Autorisé
-        // L'endpoint est public ET l'utilisateur n'a pas envoyé de token
+        // CAS 1 : Accès Public SANS Token (Visiteur Anonyme)
         if (isPublicEndpoint && (authHeader == null || !authHeader.startsWith("Bearer "))) {
-            return chain.filter(exchange);
+            // 🟢 CORRECTION : On doit injecter le secret MÊME pour les anonymes
+            ServerHttpRequest mutatedRequest = request.mutate()
+                    .header("X-Internal-Secret", INTERNAL_SECRET) // <--- L'AJOUT CRUCIAL
+                    .build();
+            return chain.filter(exchange.mutate().request(mutatedRequest).build());
         }
 
-        // 3. CAS 2 : Accès Interdit
-        // L'endpoint est protégé ET l'utilisateur n'a pas de token valide
+        // CAS 2 : Accès Privé SANS Token (Erreur)
         if (!isPublicEndpoint && (authHeader == null || !authHeader.startsWith("Bearer "))) {
             return onError(exchange, "Authorization header missing or invalid", HttpStatus.UNAUTHORIZED);
         }
 
-        // 4. CAS 3 : Traitement du Token (Authentification)
-        // Ici, on a un token (que l'endpoint soit public ou privé). On l'analyse pour injecter le contexte.
-        String token = authHeader.substring(7); // On retire "Bearer "
+        // CAS 3 : Accès AVEC Token (Utilisateur Connecté - Public ou Privé)
+        String token = authHeader.substring(7);
 
         try {
             Claims claims = jwtUtil.validateAndExtractClaims(token);
-
             String userId = String.valueOf(claims.get("userId"));
             String role = String.valueOf(claims.get("role"));
 
-            // Gestion robuste du statut (rétro-compatibilité avec 'validated' ou 'status')
             Object statusObj = claims.get("status");
-            String status;
-            if (statusObj != null) {
-                status = String.valueOf(statusObj);
-            } else {
-                Object validatedObj = claims.get("validated");
-                status = (validatedObj != null && Boolean.parseBoolean(String.valueOf(validatedObj))) ? "ACTIVE" : "PENDING";
-            }
+            String status = (statusObj != null) ? String.valueOf(statusObj) : "PENDING";
 
-            // Création de la requête mutée avec les headers internes
+            // Injection des infos utilisateurs ET du secret
             ServerHttpRequest mutatedRequest = request.mutate()
                     .header("X-User-Id", userId)
                     .header("X-User-Role", role)
                     .header("X-User-Status", status)
+                    .header("X-Internal-Secret", INTERNAL_SECRET) // Le secret est aussi ici
                     .build();
 
-            // On passe la main à la suite de la chaîne avec les nouvelles infos
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
 
         } catch (JwtException e) {

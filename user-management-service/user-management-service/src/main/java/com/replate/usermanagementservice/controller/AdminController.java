@@ -25,6 +25,13 @@ public class AdminController {
         return ResponseEntity.ok("Le compte de " + validatedUser.getEmail() + " a été validé.");
     }
 
+    @PostMapping("/reject/{id}")
+    public ResponseEntity<?> rejectAccount(@PathVariable Long id) {
+        User rejectedUser = userService.getUserById(id);
+        userService.rejectUser(id);
+        return ResponseEntity.ok("Le compte de " + rejectedUser.getEmail() + " a été rejeté.");
+    }
+
 
     @GetMapping("/pending")
     public ResponseEntity<List<User>> getPendingAccounts() {
