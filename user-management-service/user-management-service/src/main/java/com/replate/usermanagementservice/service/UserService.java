@@ -99,8 +99,8 @@ public class UserService {
     public User validateUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + id));
-
         user.setStatus(AccountStatus.ACTIVE);
+        userEventProducer.sendUserValidatedEvent(user);
         return userRepository.save(user);
     }
     public List<User> getPendingValidationAccounts() {

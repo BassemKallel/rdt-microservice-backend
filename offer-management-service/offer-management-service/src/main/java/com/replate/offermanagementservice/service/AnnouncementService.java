@@ -113,7 +113,7 @@ public class AnnouncementService {
         announcement.setUnit(request.getUnit());
         announcement.setStock(request.getStock());
 
-        announcement.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        announcement.setModerationStatus(ModerationStatus.ACCEPTED);
         announcement.setCreatedAt(LocalDateTime.now());
         announcement.setUpdatedAt(LocalDateTime.now());
 

@@ -1,6 +1,6 @@
 package com.replate.usermanagementservice.config;
 
-// ... (tous vos imports actuels sont corrects) ...
+import com.replate.usermanagementservice.security.HeadersAuthFilter;
 import com.replate.usermanagementservice.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,19 +21,22 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final HeadersAuthFilter headersAuthFilter; // Pour le Secret Interne
     private final UserDetailsService userDetailsService;
+
+    // Injection des dépendances via le constructeur
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter,
+                          HeadersAuthFilter headersAuthFilter,
+                          UserDetailsService userDetailsService) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.headersAuthFilter = headersAuthFilter;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-
-
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, UserDetailsService userDetailsService) {
-        this.jwtAuthFilter = jwtAuthFilter;
-        this.userDetailsService = userDetailsService;
-    }
-
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -48,12 +51,27 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // 1. Accès Public (Inscription / Connexion)
                         .requestMatchers("/users/register/**", "/users/login/**").permitAll()
+
+                        // 2. Monitoring (Actuator)
+                        .requestMatchers("/actuator/**").permitAll()
+
+                        // 3. Accès Interne (Pour que OMS puisse récupérer le nom du marchand)
+                        // Nécessite le rôle INTERNAL (donné par HeadersAuthFilter si le secret est bon)
+                        .requestMatchers("/users/{id}").hasAnyRole("ADMIN", "INTERNAL", "MERCHANT", "INDIVIDUAL", "ASSOCIATION")
+
+                        // 4. Accès Admin
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+
+                        // 5. Tout le reste nécessite d'être authentifié
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
+
+                // Ordre des filtres : Secret Interne d'abord, puis JWT
+                .addFilterBefore(headersAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

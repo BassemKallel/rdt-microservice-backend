@@ -4,22 +4,14 @@
   <component name="MavenProjectsManager">
     <option name="originalFiles">
       <list>
-        <option value="$PROJECT_DIR$/api-gateway/api-gateway/pom.xml" />
-        <option value="$PROJECT_DIR$/file-service/file-service/pom.xml" />
-        <option value="$PROJECT_DIR$/eureka-server/eureka-server/pom.xml" />
-        <option value="$PROJECT_DIR$/user-management-service/user-management-service/pom.xml" />
-        <option value="$PROJECT_DIR$/offer-management-service/offer-management-service/pom.xml" />
-        <option value="$PROJECT_DIR$/reporting-safety-service/reporting-safety-service/pom.xml" />
         <option value="$PROJECT_DIR$/reservation-transaction-service/reservation-transaction-service/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/eureka-server/eureka-server/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/file-service/file-service/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/gateway/gateway/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/offer-management-service/offer-management-service/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/reporting-safety-service/reporting-safety-service/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/reservation-transaction-service/reservation-transaction-service/pom.xml" />
-        <option value="$PROJECT_DIR$/rdt-microservice-backend-dev/user-management-service/user-management-service/pom.xml" />
+        <option value="$PROJECT_DIR$/user-management-service/user-management-service/pom.xml" />
+        <option value="$PROJECT_DIR$/reporting-safety-service/reporting-safety-service/pom.xml" />
+        <option value="$PROJECT_DIR$/offer-management-service/offer-management-service/pom.xml" />
         <option value="$PROJECT_DIR$/gateway/gateway/pom.xml" />
+        <option value="$PROJECT_DIR$/file-service/file-service/pom.xml" />
         <option value="$PROJECT_DIR$/favourite-service/favourite-service/pom.xml" />
+        <option value="$PROJECT_DIR$/eureka-server/eureka-server/pom.xml" />
       </list>
     </option>
   </component>
