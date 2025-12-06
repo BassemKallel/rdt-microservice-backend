@@ -88,7 +88,7 @@ services:
     command: listen --forward-to http://reservation-transaction-service:8084/webhook --api-key ${STRIPE_API_KEY}
     networks:
       - rdt-network
-    profiles: [ "dev" ] # Optionnel : ne démarre que si on demande le profil 'dev'
+    profiles: [ "dev" ]
 
   # ====================================================
   # 2. MICROSERVICES
@@ -121,7 +121,6 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rdtpassword}
       - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:29092
       - JWT_SECRET=${JWT_SECRET}
-      # Monitoring
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
       eureka-server:
@@ -146,10 +145,14 @@ services:
       - UMS_SERVICE_URL=http://user-management-service:8082
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
-      - eureka-server
-      - postgres
-      - kafka
-      - user-management-service
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      user-management-service:
+        condition: service_started
     networks:
       - rdt-network
 
@@ -168,10 +171,14 @@ services:
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
-      - eureka-server
-      - postgres
-      - kafka
-      - offer-management-service
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      offer-management-service:
+        condition: service_started
     networks:
       - rdt-network
 
@@ -186,8 +193,10 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-miniopassword}
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
-      - eureka-server
-      - minio
+      eureka-server:
+        condition: service_healthy
+      minio:
+        condition: service_started
     networks:
       - rdt-network
 
@@ -202,8 +211,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rdtpassword}
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
-      - eureka-server
-      - postgres
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - rdt-network
 
@@ -219,9 +230,12 @@ services:
       - SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=kafka:29092
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
-      - eureka-server
-      - postgres
-      - kafka
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - rdt-network
 
@@ -237,9 +251,12 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
-      - eureka-server
-      - user-management-service
-      - offer-management-service
+      eureka-server:
+        condition: service_healthy
+      user-management-service:
+        condition: service_started
+      offer-management-service:
+        condition: service_started
     networks:
       - rdt-network
 
@@ -304,4 +321,4 @@ networks:
 volumes:
   postgres_data:
   mongo_data:
-  minio_data:
+  minio_data: # Correction ici (pas de texte après)
