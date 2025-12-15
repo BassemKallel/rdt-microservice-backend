@@ -12,7 +12,14 @@
         <option value="$PROJECT_DIR$/file-service/file-service/pom.xml" />
         <option value="$PROJECT_DIR$/favourite-service/favourite-service/pom.xml" />
         <option value="$PROJECT_DIR$/eureka-server/eureka-server/pom.xml" />
+        <option value="$PROJECT_DIR$/config-server/config-server/pom.xml" />
+        <option value="$PROJECT_DIR$/config-server/pom.xml" />
       </list>
+    </option>
+    <option name="ignoredFiles">
+      <set>
+        <option value="$PROJECT_DIR$/config-server/pom.xml" />
+      </set>
     </option>
   </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_23" default="true" project-jdk-name="23" project-jdk-type="JavaSDK">

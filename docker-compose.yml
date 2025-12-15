@@ -313,6 +313,23 @@ services:
       - prometheus
       - tempo
       - loki
+  config-server:
+    build: ./config-server/config-server
+    container_name: rdt_config_server
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_URI=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - rdt-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   rdt-network:
