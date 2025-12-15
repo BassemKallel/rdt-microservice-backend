@@ -6,6 +6,7 @@ import com.replate.reservationtransactionservice.exception.*;
 import com.replate.reservationtransactionservice.model.*;
 import com.replate.reservationtransactionservice.repository.TransactionRepository;
 import com.stripe.model.PaymentIntent;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class ReservationService {
 
     // --- 1. CRÉATION ---
     @Transactional
+    @CircuitBreaker(name = "externalService", fallbackMethod = "fallbackCreateReservation")
     public ReservationResponse createReservation(ReservationRequest request) {
         // Récupération de l'annonce via OMS
         AnnouncementResponse announcement = announcementClient.getAnnouncementById(request.getAnnonceId());
@@ -54,6 +56,18 @@ public class ReservationService {
         transactionRepository.save(transaction);
 
         return mapToResponse(transaction);
+    }
+
+    public ReservationResponse fallbackCreateReservation(ReservationRequest request, Exception e) {
+        // Log l'erreur pour le débogage
+        // log.error("Fallback pour createReservation activé; error: {}", e.getMessage());
+
+        // Créer une réponse d'erreur standardisée
+        ReservationResponse response = new ReservationResponse();
+        response.setMessage("Service indisponible pour le moment. Veuillez réessayer plus tard.");
+        // Vous pouvez définir d'autres champs sur un état par défaut si nécessaire
+        response.setStatus(TransactionStatus.CANCELLED); // Ou un autre statut pertinent
+        return response;
     }
 
     // --- 2. CONFIRMATION (Marchand) ---

@@ -47,6 +47,11 @@ services:
       - minio_data:/data
     networks:
       - rdt-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -109,6 +114,48 @@ services:
       retries: 5
       start_period: 10s
 
+  # --- Config Server ---
+  config-server:
+    build: ./config-server/config-server
+    container_name: rdt_config_server
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_URI=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - rdt-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- API Gateway ---
+  gateway:
+    build: ./gateway/gateway
+    container_name: rdt_gateway
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - JWT_SECRET=${JWT_SECRET}
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
+        condition: service_healthy   # <--- Le service attendra que le config server soit prêt
+      user-management-service:
+        condition: service_started
+      offer-management-service:
+        condition: service_started
+    networks:
+      - rdt-network
+
   # --- Core Business Services ---
   user-management-service:
     build: ./user-management-service/user-management-service
@@ -124,6 +171,8 @@ services:
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
       eureka-server:
+        condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
         condition: service_healthy
       postgres:
         condition: service_healthy
@@ -146,6 +195,8 @@ services:
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
       eureka-server:
+        condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
         condition: service_healthy
       postgres:
         condition: service_healthy
@@ -173,6 +224,8 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
+        condition: service_healthy
       postgres:
         condition: service_healthy
       kafka:
@@ -195,6 +248,8 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
+        condition: service_healthy
       minio:
         condition: service_started
     networks:
@@ -212,6 +267,8 @@ services:
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
     depends_on:
       eureka-server:
+        condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
         condition: service_healthy
       postgres:
         condition: service_healthy
@@ -232,31 +289,12 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
+      config-server:                 # <--- AJOUT CRUCIAL
+        condition: service_healthy
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
-    networks:
-      - rdt-network
-
-  # --- API Gateway ---
-  gateway:
-    build: ./gateway/gateway
-    container_name: rdt_gateway
-    ports:
-      - "8081:8081"
-    environment:
-      - SERVER_PORT=8081
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - JWT_SECRET=${JWT_SECRET}
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-      user-management-service:
-        condition: service_started
-      offer-management-service:
-        condition: service_started
     networks:
       - rdt-network
 
@@ -313,23 +351,6 @@ services:
       - prometheus
       - tempo
       - loki
-  config-server:
-    build: ./config-server/config-server
-    container_name: rdt_config_server
-    ports:
-      - "8888:8888"
-    environment:
-      - EUREKA_URI=http://eureka-server:8761/eureka/
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - rdt-network
-    healthcheck:
-      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 networks:
   rdt-network:
@@ -338,4 +359,4 @@ networks:
 volumes:
   postgres_data:
   mongo_data:
-  minio_data: # Correction ici (pas de texte après)
+  minio_data:
