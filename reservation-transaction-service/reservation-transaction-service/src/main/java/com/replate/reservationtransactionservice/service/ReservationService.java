@@ -30,7 +30,7 @@ public class ReservationService {
 
     // --- 1. CRÉATION ---
     @Transactional
-    @CircuitBreaker(name = "externalService", fallbackMethod = "fallbackCreateReservation")
+    @CircuitBreaker(name = "offerService", fallbackMethod = "fallbackCreateReservation")
     public ReservationResponse createReservation(ReservationRequest request) {
         // Récupération de l'annonce via OMS
         AnnouncementResponse announcement = announcementClient.getAnnouncementById(request.getAnnonceId());
